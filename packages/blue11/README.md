@@ -3,10 +3,10 @@
 A self-contained TypeScript library. The Blue-11 implements the PDP-11 instruction set (a
 subset of its assembler syntax): the /40 model's set with the EIS option, an assembler, a
 disassembler, a bus with pluggable memory-mapped devices, DEC's console and line clock, a
-read-only memory, and a framebuffer display for teaching graphics. No dependencies. MIT licence.
+read-only memory, a framebuffer display for teaching graphics, and a keyboard for games. No dependencies. MIT licence.
 Its first users are [HackCode](https://github.com/bluedragon-ctrl/HackCode), a game, and the Blue-11
 simulator (to come). Design and rationale: [`docs/BLUE11_MACHINE.md`](https://github.com/bluedragon-ctrl/Blue11/blob/main/docs/BLUE11_MACHINE.md);
-the display: [`BLUE11_DISPLAY.md`](https://github.com/bluedragon-ctrl/Blue11/blob/main/docs/BLUE11_DISPLAY.md); to come: [`BLUE11_KEYBOARD.md`](https://github.com/bluedragon-ctrl/Blue11/blob/main/docs/BLUE11_KEYBOARD.md).
+the display: [`BLUE11_DISPLAY.md`](https://github.com/bluedragon-ctrl/Blue11/blob/main/docs/BLUE11_DISPLAY.md); the keyboard: [`BLUE11_KEYBOARD.md`](https://github.com/bluedragon-ctrl/Blue11/blob/main/docs/BLUE11_KEYBOARD.md).
 
 ```sh
 npm install blue11
@@ -25,10 +25,11 @@ test fails if a block here isn't in it. If you change an example, change both.
 6. [DeviceMachine and devices](#devicemachine-and-devices)
 7. [SimpleMachine](#simplemachine)
 8. [Display](#display): a framebuffer, two modes, 16 colours, an optional scanning beam
-9. [Host recipes](#host-recipes): keyboard, coverage, system calls, breakpoints, snapshots, disassembly
-10. [Disassembler, ISA tables, CodeMirror](#disassembler-isa-tables-codemirror)
-11. [Pitfalls](#pitfalls)
-12. [Working on the library](#working-on-the-library) (→ `AGENTS.md`)
+9. [Keyboard](#keyboard): which keys are down, and every press and release in a queue
+10. [Host recipes](#host-recipes): console input, coverage, system calls, breakpoints, snapshots, disassembly
+11. [Disassembler, ISA tables, CodeMirror](#disassembler-isa-tables-codemirror)
+12. [Pitfalls](#pitfalls)
+13. [Working on the library](#working-on-the-library) (→ `AGENTS.md`)
 
 ## Which layer to use
 
@@ -36,6 +37,7 @@ test fails if a block here isn't in it. If you change an example, change both.
 | :--- | :--- |
 | Run a program with a console (print, keyboard) and a clock | `SimpleMachine` |
 | … and a screen to draw on | `SimpleMachine({ display: true })` |
+| … and keys for games (held down, pressed, released) | `SimpleMachine({ display: true, keyboard: true })` |
 | Your own memory-mapped hardware (sensors, motors, displays), as HackCode's robot does | `DeviceMachine` + your `Device` classes (+ `DL11` / `KW11L` if wanted) |
 | Your own memory map, protection, or timing model | `Cpu` with your own `Bus` |
 | Turn source into bytes, a listing, line numbers | `assemble` |
@@ -288,7 +290,8 @@ models differed; 10 is the illegal-instruction vector). Not implemented: `MARK`,
 `MFPI`/`MTPI`, `MFPS`/`MTPS`, floating point, memory management. With `protectModes` the
 mode rules are the /45 model's, without its memory management: protect memory yourself by
 refusing writes in `bus.write`. The [display](#display) is a teaching device DEC never made:
-its registers, vector and behaviour are ours (it borrows DEC's CSR bits).
+its registers, vector and behaviour are ours (it borrows DEC's CSR bits). So is the
+[keyboard](#keyboard): DEC's terminals sent only characters, with no key-up and no "key held".
 
 **Hosting the CPU yourself** (your own `Bus`):
 - Give `run` a budget per step of your program (a frame, a tick) and subtract
@@ -398,7 +401,8 @@ with a `DL11` console (`console`) and a `KW11L` clock (`clock`). Adds `type(ch)`
 register addresses and vectors (`DEV.XBUF`, `DEV.VEC_CLOCK`, …). You can `add` more
 devices. With `display: true` (or `DisplayOptions`) it also has a [`Display`](#display) in
 `display`: RAM then ends at the pixel memory (`memory` defaults to `120000`), and the clock
-ticks once a frame (`clockCycles` defaults to `frameCycles`).
+ticks once a frame (`clockCycles` defaults to `frameCycles`). With `keyboard: true` (or
+`KeyboardOptions`) it also has a [`Keyboard`](#keyboard) in `keyboard`.
 
 ## Display
 
@@ -452,6 +456,58 @@ Also: `DSP` (the default addresses: `DSP.SCREEN`, `DSP.DSPCS`, `DSP.DSPFRM`, `DS
 (`m.run(frameCycles)` per animation frame) and paints `display.frame`; a speed control changes
 how many frames it runs per second, never `frameCycles`, so programs behave the same at every
 speed. `RESET` clears only `IE`; `boot` clears the memory and restores the palette.
+
+## Keyboard
+
+Keys for games (DEC never made this device; it is listed above as a departure). The full design
+is [`BLUE11_KEYBOARD.md`](https://github.com/bluedragon-ctrl/Blue11/blob/main/docs/BLUE11_KEYBOARD.md).
+Typed text stays the console's job (`DL11`): the keyboard tells *which key*, not which character.
+
+- **Key codes** (1–177) name positions on a US keyboard: letters and digits have their ASCII
+  codes (`'A` in the assembler), the arrows are 1–4, Shift, Ctrl and Alt 5–7 (left and right
+  alike), and `KEY` has the rest (`KEY.SPACE` is `40`). `keyCode('KeyA')` turns a browser
+  `KeyboardEvent.code` into a code, or 0 for a key the device doesn't have.
+- **The key map** at `177000`–`177177` is a byte per key, `200` while it is down: the byte of key k
+  is at `177000 + k`, so `TSTB @#177000+'Q` and `BMI` test it. Read only; writes are ignored.
+- **The event queue** at `176700`: `KBDCS` (bit 6 `IE`, bit 7 `DONE`: an event waits; bit 15 `OVR`:
+  events were lost, cleared by writing it as 0) and `KBDBUF`, the oldest event: the code, plus
+  `200` for a release. Reading `KBDBUF` takes the event (0 when empty), and the next one comes up.
+  The queue holds 16 events. With `IE` it interrupts at vector `330`, level 4, while an event waits.
+  `176704`–`176777` is a hole (bus error).
+- **Time:** live input (`press`, `release`) takes effect at once, between runs. `at(cycle, key,
+  down)` schedules it: it takes effect at the first instruction boundary at or after `cycle`.
+  `log` lists every event that took effect with its cycle, so scheduling it again with `at`
+  replays a run exactly.
+
+```ts
+const m = new SimpleMachine({ keyboard: true });   // queue at 176700, key map at 177000
+m.boot(must(assemble(`
+1$:     TSTB @#176700       ; KBDCS: DONE when an event waits
+        BPL  1$
+        MOVB @#176702, R0   ; KBDBUF: take it (a release is negative)
+        BMI  1$             ; skip releases
+        MOVB @#177000+'Q, R1 ; the key map: is Q down? (200: yes)
+        HALT
+`)));
+m.keyboard!.at(500, 'KeyQ', true);                 // press Q at cycle 500 (a KeyboardEvent.code, or KEY / a code)
+m.run(10_000);                                     // R0 = 121 (Q), R1 = 177600 (200, sign-extended)
+const log = m.keyboard!.log;                       // [{ cycle: 500 or a little later, code: 0o121, down: true }]
+```
+
+| Member | |
+| :--- | :--- |
+| `new Keyboard({ base?, map?, vector?, level?, queue? })` | defaults `176700`, `177000`, `330`, 4, 16. Throws on a bad option |
+| `registers`, `map` | the two `Device`s (`KBDCS` / `KBDBUF`, and the key map): `add` both to a `DeviceMachine` |
+| `press(key)`, `release(key)` | now. `key` is a code or a `KeyboardEvent.code`; give the codes `'ShiftLeft'` and `'ShiftRight'` so Shift stays down while either is held. A key already down (or up) is ignored, so never pass on the browser's auto-repeat |
+| `releaseAll()` | every key up, for when the page loses focus |
+| `at(cycle, key, down)` | later: at the first instruction boundary at or after `cycle`. Throws for a cycle in the past |
+| `log` | `[{ cycle, code, down }]`: every event that took effect since power-up |
+| `keys`, `cycle` | the key map now, and the cycle the keyboard is at (read them freely) |
+| `state()`, `load(state)` | the device as plain data, scheduled input included (it survives `JSON.stringify`) |
+
+`RESET` clears only `IE`; `boot` lets every key go and forgets the queue, the log and scheduled
+input (schedule a replay after `boot`). A key held during `boot` reads as up until it is
+pressed again.
 
 ## Host recipes
 

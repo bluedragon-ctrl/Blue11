@@ -1,16 +1,26 @@
 /**
  * Example programs for a `SimpleMachine` (DL11 console, KW11-L clock, and for
- * `DISPLAY_EXAMPLES` the display). The standalone simulator (docs/ROADMAP.md) shows them;
- * test/examples.test.ts runs each one and checks it prints `expect`, and
- * test/display.test.ts checks the frames the display examples draw.
+ * `DISPLAY_EXAMPLES` the display, for `KEYBOARD_EXAMPLES` the keyboard and display). The
+ * standalone simulator (docs/ROADMAP.md) shows them; test/examples.test.ts runs each one
+ * and checks it prints `expect`, test/display.test.ts checks the frames the display
+ * examples draw, and test/keyboard.test.ts drives the keyboard examples with scheduled keys.
  */
 
-import { DEV, DSP, PSW_ADDRESS, type Beam } from '../src/index.js';
+import { DEV, DSP, KBD, KEY, PSW_ADDRESS, type Beam } from '../src/index.js';
 
-/** Device register names the examples use (DL11 console, KW11-L clock, display). */
+/** The simulator's names for key codes (docs/BLUE11_KEYBOARD.md §3); letters and digits need none (`'A`). */
+export const KEY_SYMBOLS: Record<string, number> = {
+  'K.UP': KEY.UP, 'K.DOWN': KEY.DOWN, 'K.LEFT': KEY.LEFT, 'K.RGHT': KEY.RIGHT,
+  'K.SHFT': KEY.SHIFT, 'K.CTRL': KEY.CTRL, 'K.ALT': KEY.ALT, 'K.BS': KEY.BACKSPACE,
+  'K.TAB': KEY.TAB, 'K.ENT': KEY.ENTER, 'K.ESC': KEY.ESC, 'K.SPC': KEY.SPACE, 'K.DEL': KEY.DELETE,
+};
+
+/** Device register names the examples use (DL11 console, KW11-L clock, display, keyboard). */
 export const SIM_SYMBOLS: Record<string, number> = {
   RCSR: DEV.RCSR, RBUF: DEV.RBUF, XCSR: DEV.XCSR, XBUF: DEV.XBUF, LKS: DEV.LKS, PSW: PSW_ADDRESS,
   SCREEN: DSP.SCREEN, DSPCS: DSP.DSPCS, DSPFRM: DSP.DSPFRM, DSPLIN: DSP.DSPLIN, DSPPAL: DSP.DSPPAL, DSPVEC: DSP.VEC,
+  KBDCS: KBD.KBDCS, KBDBUF: KBD.KBDBUF, KBDKEY: KBD.KBDKEY, KBDVEC: KBD.VEC,
+  ...KEY_SYMBOLS,
 };
 
 export interface Example {
@@ -550,6 +560,207 @@ FRAME:  JSR  PC, VSYNC          ; the blank: the beam will start at row 0
         JSR  PC, VSYNC          ; let the last frame be shown
         HALT                    ; stop the CPU
 SKY:    .WORD ${SKY.map((c) => c.toString(8).padStart(3, '0')).join(', ')} ; dark blue to light
+${VSYNC}
+`,
+  },
+];
+
+// -------------------------------------------------------------------- the keyboard
+
+/** A keyboard example: it runs on a SimpleMachine with the keyboard and the display. */
+export interface KeyboardExample {
+  name: string;
+  source: string;
+  /** What to do with it (shown by the simulator). */
+  keys: string;
+}
+
+/** GETKEY, as in docs/BLUE11_KEYBOARD.md §5. */
+export const GETKEY = `
+; GETKEY: wait for a key press and return its code in R0; releases are skipped.
+GETKEY: TSTB @#KBDCS            ; DONE: an event waiting?
+        BPL  GETKEY             ; not yet
+        MOVB @#KBDBUF, R0       ; take it
+        BMI  GETKEY             ; a release: not what we want
+        RTS  PC                 ; back to the caller`;
+
+const PUTS = `
+; PUTS: print the text at R1, up to its 0 byte.
+PUTS:   MOVB (R1)+, R0          ; the next character
+        BEQ  1$                 ; 0: the end of the text
+        JSR  PC, PUTC           ; print it
+        BR   PUTS               ; and the next
+1$:     RTS  PC                 ; back to the caller`;
+
+export const KEYBOARD_EXAMPLES: KeyboardExample[] = [
+  {
+    name: 'Moving a dot (the key map)',
+    keys: 'Hold the arrow keys to move the dot; Q quits.',
+    source: `
+; A white dot moves while an arrow key is held. Once a frame the program
+; looks at the arrows in the key map: TSTB and BPL, no masks, no shifts.
+        MOV  #40, R2            ; x = 40, the middle
+        MOV  #40, R3            ; y = 40
+LOOP:   JSR  PC, ADDR           ; R4 = the dot's address
+        MOVB #17, (R4)          ; draw the dot in colour 17: white
+        JSR  PC, VSYNC          ; once a frame: the picture is shown
+        CLRB (R4)               ; rub the dot out
+        TSTB @#KBDKEY+K.LEFT    ; left arrow down?
+        BPL  1$                 ; no
+        DEC  R2                 ; x - 1
+1$:     TSTB @#KBDKEY+K.RGHT    ; right arrow down?
+        BPL  2$                 ; no
+        INC  R2                 ; x + 1
+2$:     TSTB @#KBDKEY+K.UP      ; up arrow down?
+        BPL  3$                 ; no
+        DEC  R3                 ; y - 1
+3$:     TSTB @#KBDKEY+K.DOWN    ; down arrow down?
+        BPL  4$                 ; no
+        INC  R3                 ; y + 1
+4$:     BIC  #177700, R2        ; keep x in 0-77: off one edge, on at the other
+        BIC  #177700, R3        ; the same for y
+        TSTB @#KBDKEY+'Q        ; Q down?
+        BPL  LOOP               ; no: the next frame
+        HALT                    ; Q quits
+
+; ADDR: R4 = the address of pixel (R2, R3) in mode 0, page 0.
+ADDR:   MOV  R3, R4             ; y
+        SWAB R4                 ; y * 400
+        ASR  R4                 ; y * 200
+        ASR  R4                 ; y * 100: the row
+        ADD  R2, R4             ; + x
+        ADD  #SCREEN, R4        ; + the page
+        RTS  PC                 ; back to the caller
+${VSYNC}
+`,
+  },
+  {
+    name: 'Key names (GETKEY)',
+    keys: 'Press keys: their names appear on the console. Esc quits.',
+    source: `
+; Prints each key pressed, with GETKEY. Letters and digits (and the signs
+; between them) print as themselves, other keys by name, from a table.
+LOOP:   JSR  PC, GETKEY         ; R0 = the next key pressed
+        CMPB R0, #'0            ; below the digits?
+        BLO  1$                 ; yes: a key with a name
+        CMPB R0, #'Z            ; above the letters?
+        BHI  1$                 ; yes: a key with a name
+        JSR  PC, PUTC           ; print the key itself
+        BR   4$                 ; then a space
+1$:     MOV  R0, R3             ; keep the key code
+        MOV  #NAMES, R1         ; look the key up in the table
+2$:     MOVB (R1)+, R2          ; a key code, or 0 at the end
+        BEQ  5$                 ; the end: the key has no name
+        CMPB R2, R3             ; this key?
+        BEQ  3$                 ; yes: its name follows
+6$:     TSTB (R1)+              ; skip the name...
+        BNE  6$                 ; ...and the 0 that ends it
+        BR   2$                 ; the next entry
+3$:     JSR  PC, PUTS           ; print the name
+        CMPB R3, #K.ESC         ; was it Esc?
+        BNE  4$                 ; no: go on
+        HALT                    ; Esc quits
+5$:     MOVB #'?, R0            ; a key with no name
+        JSR  PC, PUTC           ; prints as ?
+4$:     MOVB #40, R0            ; a space
+        JSR  PC, PUTC           ; after each key
+        BR   LOOP               ; the next key
+NAMES:  .BYTE K.UP              ; each entry: a key code...
+        .ASCIZ /UP/             ; ...then its name and a 0 byte
+        .BYTE K.DOWN            ; down arrow
+        .ASCIZ /DOWN/           ;
+        .BYTE K.LEFT            ; left arrow
+        .ASCIZ /LEFT/           ;
+        .BYTE K.RGHT            ; right arrow
+        .ASCIZ /RIGHT/          ;
+        .BYTE K.SPC             ; Space
+        .ASCIZ /SPACE/          ;
+        .BYTE K.ENT             ; Enter
+        .ASCIZ /ENTER/          ;
+        .BYTE K.BS              ; Backspace
+        .ASCIZ /BS/             ;
+        .BYTE K.TAB             ; Tab
+        .ASCIZ /TAB/            ;
+        .BYTE K.DEL             ; Delete
+        .ASCIZ /DEL/            ;
+        .BYTE K.ESC             ; Esc
+        .ASCIZ /ESC/            ;
+        .BYTE 0                 ; the end of the table
+        .EVEN                   ; code must start at an even address
+${GETKEY}
+${PUTS}
+${PUTC}
+`,
+  },
+  {
+    name: 'Counting Space (the interrupt)',
+    keys: 'Press Space a few times (up to 7), then Esc: the count is printed.',
+    source: `
+; Counts presses of Space with the keyboard interrupt. Between keys the
+; program sleeps in WAIT; every event wakes it.
+        MOV  #KBDINT, @#KBDVEC  ; the handler
+        MOV  #200, @#KBDVEC+2   ; its PSW: priority 4, so it isn't interrupted again
+        BIS  #100, @#KBDCS      ; IE: interrupt when an event is waiting
+1$:     WAIT                    ; sleep until a key event
+        TST  QUIT               ; Esc pressed?
+        BEQ  1$                 ; no: sleep again
+        MOV  COUNT, R0          ; the count
+        ADD  #'0, R0            ; as a digit
+        JSR  PC, PUTC           ; print it
+        HALT                    ; stop the CPU
+COUNT:  .WORD 0                 ; presses of Space
+QUIT:   .WORD 0                 ; not 0: Esc was pressed
+
+; KBDINT: the handler at vector 330.
+KBDINT: MOVB @#KBDBUF, R0       ; taking the event withdraws the request
+        CMPB R0, #K.SPC         ; Space pressed? (a release is 240, which differs)
+        BNE  1$                 ; no
+        INC  COUNT              ; one more
+1$:     CMPB R0, #K.ESC         ; Esc pressed?
+        BNE  2$                 ; no
+        INC  QUIT               ; tell the program
+2$:     RTI                     ; if another event is waiting, it interrupts again
+${PUTC}
+`,
+  },
+  {
+    name: 'A short tap (key map or queue)',
+    keys: 'Tap Space as briefly as you can, within 10 frames.',
+    source: `
+; Once a frame, look for Space two ways: in the key map, and in the event
+; queue. A tap shorter than a frame can fall between two looks at the
+; map, but every press waits in the queue. After 10. frames, print both.
+        MOV  #10., R3           ; 10. frames
+FRAME:  JSR  PC, VSYNC          ; once a frame
+        TSTB @#KBDKEY+K.SPC     ; Space down now?
+        BPL  1$                 ; no
+        INC  MAP                ; the key map saw it
+1$:     TSTB @#KBDCS            ; an event waiting?
+        BPL  2$                 ; no: the queue is empty
+        MOVB @#KBDBUF, R0       ; take it
+        CMPB R0, #K.SPC         ; Space pressed?
+        BNE  1$                 ; no: the next event
+        INC  QUEUE              ; the queue saw it
+        BR   1$                 ; the next event
+2$:     SOB  R3, FRAME          ; the next frame
+        MOV  #TMAP, R1          ; "MAP "
+        JSR  PC, PUTS           ; print it
+        MOV  MAP, R0            ; frames in which the map showed Space down
+        ADD  #'0, R0            ; as a digit (up to 9.)
+        JSR  PC, PUTC           ; print it
+        MOV  #TQUEUE, R1        ; ", QUEUE "
+        JSR  PC, PUTS           ; print it
+        MOV  QUEUE, R0          ; presses of Space in the queue
+        ADD  #'0, R0            ; as a digit
+        JSR  PC, PUTC           ; print it
+        HALT                    ; stop the CPU
+MAP:    .WORD 0                 ; frames with Space down in the map
+QUEUE:  .WORD 0                 ; presses of Space in the queue
+TMAP:   .ASCIZ /MAP /           ; the texts
+TQUEUE: .ASCIZ /, QUEUE /       ;
+        .EVEN                   ; code must start at an even address
+${PUTS}
+${PUTC}
 ${VSYNC}
 `,
   },

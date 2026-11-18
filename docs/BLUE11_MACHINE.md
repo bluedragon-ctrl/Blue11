@@ -387,7 +387,7 @@ difference is listed here and in the README:
 | Options: EIS on or off, the cycle model, long names, `protectModes`, `stackLimit`, hooks (`onTrap`, `onInstruction`, `onAccess`, `onModeChange`) | its own devices, and its predefined symbols |
 | The assembler (§3) → words, a listing, the symbol table, a source line map, errors and warnings | its ROM contents (HackCode's BIOS, the simulator's font and `DRAWCH`) |
 | The disassembler and the octal listing format (§3.5) | when its own devices interrupt, and what `HALT` means to it |
-| `DeviceMachine`, the `Device` interface, `SimpleMachine`. DEC's `DL11` and `KW11L`. The general devices: `Rom`, `Display`, and `Keyboard` (specified, not built) | its UI: editor, debugger, lessons, help, saves |
+| `DeviceMachine`, the `Device` interface, `SimpleMachine`. DEC's `DL11` and `KW11L`. The general devices: `Rom`, `Display`, and `Keyboard` | its UI: editor, debugger, lessons, help, saves |
 | Saving and restoring state as plain JSON | |
 | A separate, optional entry point: CodeMirror syntax highlighting | |
 

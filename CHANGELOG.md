@@ -3,7 +3,18 @@
 The npm package `blue11` follows [semantic versioning](https://semver.org): before 1.0, a
 minor version may break the API, and a patch never does. The public API is everything
 exported from `blue11` and `blue11/codemirror`, plus the JSON form of saved states
-(`cpu.save()`, `display.state()`).
+(`cpu.save()`, `display.state()`, `keyboard.state()`).
+
+## 0.3.0 (2026-11-18)
+
+- `Keyboard`: keys for games (docs/BLUE11_KEYBOARD.md). A key map at `177000` (a byte per key,
+  `200` while down), and a queue of 16 press and release events at `176700` (`KBDCS`, `KBDBUF`)
+  with `OVR` and an interrupt at vector `330`. The host calls `press` / `release` (live) or `at`
+  (scheduled, for exact replays), and gets a `log`; `state()` / `load()`. Also `KBD`, `KEY` and
+  `keyCode` (a browser `KeyboardEvent.code` to a key code).
+- `SimpleMachine({ keyboard })` adds a keyboard.
+- Keyboard example programs (`KEYBOARD_EXAMPLES` and `KEY_SYMBOLS` in `examples/examples.ts`, not
+  part of the API).
 
 ## 0.2.0 (2026-11-18)
 

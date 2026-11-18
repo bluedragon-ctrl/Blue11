@@ -30,7 +30,7 @@ console.log(m.output);      // HELLO
 
 - **The library:** [`packages/blue11`](packages/blue11/README.md), with its API reference,
   recipes and pitfalls.
-- **The design:** [the machine](docs/BLUE11_MACHINE.md), and the next devices: [a
+- **The design:** [the machine](docs/BLUE11_MACHINE.md), and its devices: [a
   display](docs/BLUE11_DISPLAY.md) and [a keyboard](docs/BLUE11_KEYBOARD.md).
 - **What comes next:** [`docs/ROADMAP.md`](docs/ROADMAP.md), including a simulator in the
   browser where students write programs that draw and read the keyboard.

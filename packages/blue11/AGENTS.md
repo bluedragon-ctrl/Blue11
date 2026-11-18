@@ -47,6 +47,7 @@ Sources are in `src/`, tests in `test/`.
 | Assembler syntax, directives, warnings | `assembler.ts` | `assembler.test.ts`, `syntax.test.ts` (compatibility claims), `syntax-warnings.test.ts` (implicit `.WORD`, warnings) |
 | Bus, devices, time, `WAIT` | `devices.ts` (`DeviceMachine`, `DL11`, `KW11L`, `Rom`) | `devices.test.ts`, `cpu.test.ts` (interrupts) |
 | The display | `display.ts` (`Display`, `frameToRgba`) | `display.test.ts` (also the `DISPLAY_EXAMPLES`) |
+| The keyboard | `keyboard.ts` (`Keyboard`, `keyCode`) | `keyboard.test.ts` (also the `KEYBOARD_EXAMPLES`) |
 | `SimpleMachine` | `machine.ts` | `examples.test.ts` (the programs in `examples/examples.ts`), `readme-examples.test.ts` |
 | Syntax highlighting | `codemirror.ts` | – |
 | Public API | `index.ts` | `boundary.test.ts` |
