@@ -12,6 +12,8 @@ export function describeTrap(t: TrapInfo, cpu: Cpu, read: (a: number) => number)
     case 'bus-error':
       if (inRom(a)) return `Bus error ${at}: the ROM at ${octal(a)} is read-only.`;
       return `Bus error ${at}: nothing answers at ${octal(a)}.`;
+    case 'privileged':
+      return `HALT ${at} in user mode, with no handler at 004: only the kernel may stop the machine.`;
     case 'stack-limit':
       return `Stack overflow ${at}: SP went below ${octal(a)}.`;
     case 'illegal': {

@@ -33,7 +33,8 @@ export interface CpuOptions {
   /**
    * The original /45 model's rules for the non-kernel modes (PSW bits 15–14 ≠ 0): `RTI` / `RTT` can't lower
    * the mode bits (15–11) or change the priority (7–5); a write to the PSW's bus address
-   * traps to 4 (the I/O page is not the user's); `RESET` does nothing. Default off.
+   * traps to 4 (the I/O page is not the user's); `HALT` traps to 4 (cause `'privileged'`);
+   * `RESET` and `WAIT` do nothing. Default off.
    */
   protectModes?: boolean;
 }
@@ -49,7 +50,7 @@ export const VEC = {
 } as const;
 
 export type TrapCause =
-  | 'odd-address' | 'bus-error' | 'stack-limit' | 'illegal' | 'reserved'
+  | 'odd-address' | 'bus-error' | 'stack-limit' | 'privileged' | 'illegal' | 'reserved'
   | 'bpt' | 'trace' | 'iot' | 'emt' | 'trap' | 'interrupt';
 
 export interface TrapInfo {
@@ -120,7 +121,7 @@ export class Cpu {
   halted = false;
   /**
    * Stack limit (the original /70 model's `STKLIM` style, simplified): a push through `SP` to an address
-   * below it traps to 4 before anything is written. 0 = no limit.
+   * below it (`-(SP)`, `@-(SP)`, `JSR`, a trap) traps to 4 before anything is written. 0 = no limit.
    */
   stackLimit = 0;
 
@@ -345,6 +346,7 @@ export class Cpu {
         return a;
       case 5:
         a = (this.r[reg] - 2) & 0xffff;
+        if (reg === SP && this.stackLimit && a < this.stackLimit) throw this.busFault('stack-limit', a);
         this.r[reg] = a;
         return this.read(a, false);
       case 6: {
@@ -674,8 +676,12 @@ export class Cpu {
       return;
     }
     switch (w) {
-      case 0: this.halted = true; return { stop: 'halt' };
-      case 1: this.waiting = true; return { stop: 'wait' };
+      case 0: // HALT: outside kernel mode a /45 traps instead of stopping the machine
+        if (this.protectModes && this.mode !== 0) return { vector: VEC.BUS_ERROR, cause: 'privileged', pc: this.ipc };
+        this.halted = true; return { stop: 'halt' };
+      case 1: // WAIT: outside kernel mode a /45 goes straight on
+        if (this.protectModes && this.mode !== 0) return;
+        this.waiting = true; return { stop: 'wait' };
       case 2: case 6: { // RTI, RTT
         const pc = this.pop();
         let psw = this.pop();

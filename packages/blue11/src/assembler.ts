@@ -75,10 +75,17 @@ export interface AssembleResult {
 /** What a machine needs to run an assembly: its bytes, where they go, where to start. */
 export type Program = Pick<AssembleResult, 'origin' | 'bytes' | 'start'>;
 
-const IGNORED = new Set(['.TITLE', '.SBTTL', '.IDENT', '.ENABL', '.DSABL', '.LIST', '.NLIST', '.PAGE']);
+const IGNORED = new Set(['.TITLE', '.SBTTL', '.IDENT', '.LIST', '.NLIST', '.PAGE']);
+/** `.ENABL` / `.DSABL` arguments that change only listings or symbol tables: accepted and ignored. */
+const IGNORED_FUNCTIONS = new Set(['LC', 'LCM', 'GBL', 'REG', 'CRF']);
 
 class AsmFail {
   constructor(readonly message: string, readonly column = 0) {}
+}
+
+/** A size or address pass 1 can't know, because `name` is defined later. */
+class SizeFail extends AsmFail {
+  constructor(message: string, column: number, readonly name?: string) { super(message, column); }
 }
 
 interface Operand {
@@ -92,6 +99,8 @@ interface Value {
   value: number;
   /** An undefined symbol was used (allowed in pass 1). */
   undef: boolean;
+  /** The first undefined symbol, as written. */
+  undefName?: string;
 }
 
 export function assemble(source: string, opts: AssembleOptions = {}): AssembleResult {
@@ -107,6 +116,17 @@ class Assembler {
   private readonly labels = new Set<string>();
   /** Bytes each line produced in pass 1, so a line with an error keeps its size in pass 2. */
   private pass1Size = new Map<number, number>();
+  /**
+   * Lines that failed in pass 1, where pass 1 could not know their size (`.BLKW N` with `N`
+   * defined later). Pass 2 fails them the same way, so later labels stay where pass 1 put them.
+   */
+  private pass1Fail = new Map<number, { message: string; column: number; name?: string }>();
+  /** The line where each register symbol (`DIR = %1`) is first defined. */
+  private regSymbolLine = new Map<string, number>();
+  /** `.ENABL LSB`: ordinary labels don't end the local-label block. */
+  private lsb = false;
+  /** `.ENABL AMA`: relative operands are assembled as absolute (`@#`). */
+  private ama = false;
   /** Labels defined so far in this pass (duplicates). */
   private definedThisPass = new Set<string>();
   private errors: AsmError[] = [];
@@ -136,6 +156,8 @@ class Assembler {
     for (this.pass = 1; this.pass <= 2; this.pass++) {
       this.lc = (this.opts.origin ?? 0o1000) & 0xffff;
       this.scope = 0;
+      this.lsb = false;
+      this.ama = false;
       this.definedThisPass = new Set();
       this.errors = [];
       this.warnings = [];
@@ -199,6 +221,12 @@ class Assembler {
         pos += m[0].length;
       }
       skip();
+      const failed = this.pass === 2 ? this.pass1Fail.get(this.lineNo) : undefined;
+      // A size pass 1 could not know: fail again (explaining why), unless the symbol is still
+      // undefined, which the line itself reports.
+      if (failed && (!failed.name || this.defined(failed.name, pos))) {
+        throw new AsmFail(failed.name ? `${failed.message} (${failed.name} is defined later)` : failed.message, failed.column);
+      }
       const rest = text.slice(pos);
       if (rest === '') { this.record(this.lc, [], false); return true; }
 
@@ -240,6 +268,9 @@ class Assembler {
       }
     } catch (e) {
       if (!(e instanceof AsmFail)) throw e;
+      if (this.pass === 1 && !this.pass1Fail.has(this.lineNo)) {
+        this.pass1Fail.set(this.lineNo, { message: e.message, column: e.column, name: e instanceof SizeFail ? e.name : undefined });
+      }
       this.error(e.message, e.column);
       const size = this.pass === 2 ? (this.pass1Size.get(this.lineNo) ?? 0) : 0;
       const here = this.lc;
@@ -286,7 +317,7 @@ class Assembler {
       key = `${this.scope}:${name}`;
     } else {
       key = this.checkName(name, column, true);
-      this.scope++;
+      if (!this.lsb) this.scope++;
       this.labels.add(key);
     }
     this.defineSymbol(key, this.lc, column, true);
@@ -309,7 +340,7 @@ class Assembler {
   private assign(name: string, exprText: string, column: number, exprCol: number): void {
     if (name === '.') {
       const v = this.expr(exprText, exprCol);
-      if (v.undef) throw new AsmFail('the location counter can only move to a known address', exprCol);
+      if (v.undef) throw new SizeFail('the location counter can only move to a known address', exprCol, v.undefName);
       this.lc = v.value & 0xffff;
       return;
     }
@@ -319,6 +350,7 @@ class Assembler {
       const v = this.expr(t.slice(1), exprCol + 1);
       if (v.undef || v.value > 7) throw new AsmFail('a register symbol needs %0–%7', exprCol);
       this.regSymbols.set(key, v.value);
+      if (!this.regSymbolLine.has(key)) this.regSymbolLine.set(key, this.lineNo);
       return;
     }
     if (this.labels.has(key)) throw new AsmFail(`${name} is a label`, column);
@@ -363,7 +395,7 @@ class Assembler {
       case '.BLKW':
       case '.BLKB': {
         const v = args.trim() === '' ? { value: 1, undef: false } : this.expr(args, col);
-        if (v.undef) throw new AsmFail(`${name} needs a size known at this point`, col);
+        if (v.undef) throw new SizeFail(`${name} needs a size known at this point`, col, v.undefName);
         if (v.value < 0 || v.value > 0o77777) throw new AsmFail(`bad size ${v.value}`, col);
         if (name === '.BLKW' && (here & 1)) throw new AsmFail('.BLKW at an odd address (add .EVEN before it)', nameCol);
         this.emit(new Array<number>(name === '.BLKW' ? v.value * 2 : v.value).fill(0), false);
@@ -389,6 +421,25 @@ class Assembler {
           }
         }
         return false;
+      }
+      case '.ENABL':
+      case '.DSABL': {
+        const on = name === '.ENABL';
+        const fns = args.trim() === '' ? [] : splitArgs(args, col);
+        if (!fns.length) throw new AsmFail(`${name} needs a function: ${name} LSB`, nameCol);
+        for (const f of fns) {
+          const fn = f.text.toUpperCase();
+          if (fn === 'LSB') {
+            if (on) this.scope++; // a new local-label block, even inside one
+            this.lsb = on;
+          } else if (fn === 'AMA') {
+            this.ama = on;
+          } else if (!IGNORED_FUNCTIONS.has(fn)) {
+            throw new AsmFail(`${name} ${f.text} is not supported (LSB, AMA, LC, LCM, GBL, REG, CRF are)`, f.column);
+          }
+        }
+        this.record(here, [], false);
+        return true;
       }
       default:
         if (IGNORED.has(name)) { this.record(here, [], false); return true; }
@@ -546,7 +597,11 @@ class Assembler {
   private tryRegister(t: string, column: number): number | null {
     const up = t.toUpperCase();
     if (up in REGISTERS) return REGISTERS[up];
-    if (this.regSymbols.has(up)) return this.regSymbols.get(up)!;
+    if (this.regSymbols.has(up)) {
+      // Pass 1 did not know it yet and gave the operand an address word: the sizes would differ.
+      if ((this.regSymbolLine.get(up) ?? 0) > this.lineNo) throw new AsmFail(`${t} is used before ${t} = %n defines it as a register`, column);
+      return this.regSymbols.get(up)!;
+    }
     if (up.startsWith('%')) {
       const v = this.expr(up.slice(1), column + 1);
       if (v.value < 0 || v.value > 7) throw new AsmFail('registers are %0–%7', column);
@@ -576,6 +631,7 @@ class Assembler {
     if (m) return { mode: 6 + d, reg: this.register(m[2], column + m[1].length + 1), extra: { expr: m[1], relative: false, column } };
     const r = this.tryRegister(s, column);
     if (r !== null) return { mode: d, reg: r };
+    if (this.ama && !deferred) return { mode: 3, reg: 7, extra: { expr: s, relative: false, column } }; // .ENABL AMA: @#
     return { mode: 6 + d, reg: 7, extra: { expr: s, relative: true, column } };
   }
 
@@ -591,6 +647,7 @@ class Assembler {
     const p = new ExprParser(text, column, (name, col) => this.lookup(name, col), this.opts.hex ?? false);
     const v = p.parse();
     if (v.undef && this.pass === 2) throw new AsmFail(`undefined symbol ${p.undefName}`, p.undefCol);
+    if (v.undef) v.undefName = p.undefName;
     if (p.mixedAt !== null) {
       this.warn(`${p.mixedOp} after + or - is evaluated left to right, not first: group with < > (1+<2*3>)`, p.mixedAt);
     }

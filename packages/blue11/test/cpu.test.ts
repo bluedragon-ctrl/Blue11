@@ -294,6 +294,15 @@ HI:     ADD #10, R1
     expect(r.trap?.cause).toBe('stack-limit');
   });
 
+  it('stack limit also traps @-(SP) (autodecrement deferred)', () => {
+    const { m } = boot(' MOV #1000, SP\n TST @-(SP)\n HALT');
+    m.cpu.stackLimit = 0o1000;
+    m.cpu.onTrap = () => 'stop';
+    const r = m.run(100);
+    expect(r.trap?.cause).toBe('stack-limit');
+    expect(m.cpu.r[6]).toBe(0o1000); // SP is not changed
+  });
+
   it('trace bit traps after each instruction', () => {
     const { cpu } = runAsm(`
         MOV #H, @#14
@@ -490,14 +499,16 @@ describe('blue11 CPU: protectModes (user-mode rules of the original /45 model)',
   const user = (body: string) => `
         MOV  #TRAP4, @#4
         MOV  #0, @#6            ; the handler runs in kernel mode, priority 0
+        MOV  #DONE, @#30        ; EMT: back to the kernel, which halts
+        MOV  #0, @#32
         MOV  #170000, -(SP)     ; user mode
         MOV  #USER, -(SP)
         RTI
 USER:   ${body}
         MOV  @#177776, R1       ; reading the PSW is allowed
-        HALT
+        EMT
 TRAP4:  MOV  #1, R5
-        HALT`;
+DONE:   HALT`;
 
   it('a PSW write in user mode traps to 4; RTI cannot lower the mode or change the priority', () => {
     const w = runAsm(user('CLR @#177776'), { protectModes: true });
@@ -506,6 +517,25 @@ TRAP4:  MOV  #1, R5
     expect(r.cpu.r[5]).toBe(0);
     expect(r.cpu.r[1] >> 14).toBe(3); // still user
     expect((r.cpu.r[1] >> 5) & 7).toBe(0); // priority unchanged
+  });
+
+  it('HALT in user mode traps to 4 (cause privileged); WAIT does nothing', () => {
+    const h = runAsm(user('MOV #7, R0\n        HALT\n        MOV #2, R5'), { protectModes: true });
+    expect(h.cpu.r[5]).toBe(1); // the handler ran, the machine did not stop in user mode
+    const traps: string[] = [];
+    const t = boot(user('HALT'), { protectModes: true });
+    t.m.cpu.onTrap = (x) => { traps.push(`${x.cause} ${x.vector}`); return 'vector'; };
+    t.m.run(1000);
+    expect(traps).toEqual(['privileged 4']);
+    const w = runAsm(user('WAIT\n        MOV #3, R4'), { protectModes: true });
+    expect(w.cpu.r[4]).toBe(3); // WAIT went on at once
+    expect(w.cpu.r[5]).toBe(0);
+    expect(w.result.reason).toBe('halt'); // the kernel's HALT, after EMT
+  });
+
+  it('HALT and WAIT in kernel mode, or without the option, behave as usual', () => {
+    const k = runAsm(' MOV #140000, @#177776\n HALT');
+    expect(k.result.reason).toBe('halt');
   });
 
   it('without the option the CPU is a plain /40 model (no modes enforced)', () => {

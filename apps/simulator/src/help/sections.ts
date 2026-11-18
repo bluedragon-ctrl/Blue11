@@ -148,7 +148,8 @@ const assembler: Section = {
       e('dir-.END', ['.END'], '`.END label`', 'The end of the program; the label, if any, is where it starts. Without it the program starts at its first instruction.'),
     ),
     p('The program is assembled from address 1000 unless you move `.` first. It is one file: there are no macros or include files. '
-      + '`.TITLE`, `.SBTTL`, `.IDENT`, `.ENABL`, `.DSABL`, `.LIST`, `.NLIST` and `.PAGE` are accepted and ignored, as on the original assembler.'),
+      + '`.TITLE`, `.SBTTL`, `.IDENT`, `.LIST`, `.NLIST` and `.PAGE` are accepted and ignored, as on the original assembler. '
+      + '`.ENABL LSB` makes local labels such as `1$` reach across ordinary labels until `.DSABL LSB`; `.ENABL AMA` assembles `LABEL` as `@#LABEL`.'),
   ],
 };
 
