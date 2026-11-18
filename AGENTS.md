@@ -20,8 +20,9 @@ for teaching, with a simulator for students (to come). Hosts such as
 
 CI (`.github/workflows/ci.yml`) typechecks, tests, builds, then packs the package and imports
 it, on every PR and push to `main`. To release, bump `packages/blue11/package.json` and
-`CHANGELOG.md`, then push a tag `vX.Y.Z` with the same version. `release.yml` publishes it to
-npm (it needs the `NPM_TOKEN` secret).
+`CHANGELOG.md`, then either push a tag `vX.Y.Z` with the same version, or run "Release to npm"
+by hand on `main` (it creates the tag). `release.yml` publishes to npm (it needs the
+`NPM_TOKEN` secret).
 
 ## Conventions
 

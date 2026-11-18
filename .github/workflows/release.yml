@@ -1,14 +1,18 @@
 name: Release to npm
 
-# Push a tag vX.Y.Z whose version equals packages/blue11/package.json to publish it.
-# Needs the repository secret NPM_TOKEN (an npm automation or granular token).
+# Publishes packages/blue11 to npm. Two ways to start it:
+# - push a tag vX.Y.Z whose version equals packages/blue11/package.json, or
+# - run it by hand (Actions → Release to npm → Run workflow) on main: it publishes the version in
+#   package.json, then creates the tag vX.Y.Z itself.
+# Needs the repository secret NPM_TOKEN (an npm granular token with read and write access).
 
 on:
   push:
     tags: ['v*']
+  workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write # to create the tag on a manual run
   id-token: write # npm provenance
 
 jobs:
@@ -22,12 +26,27 @@ jobs:
           cache: npm
           registry-url: https://registry.npmjs.org
       - run: npm ci
-      - name: The tag matches the package version
+      - name: Check the version
+        id: version
         run: |
           v=$(node -p "require('./packages/blue11/package.json').version")
-          test "v$v" = "$GITHUB_REF_NAME" || { echo "tag $GITHUB_REF_NAME, package $v"; exit 1; }
+          echo "tag=v$v" >> "$GITHUB_OUTPUT"
+          if [ "$GITHUB_REF_TYPE" = tag ]; then
+            test "v$v" = "$GITHUB_REF_NAME" || { echo "tag $GITHUB_REF_NAME, package $v"; exit 1; }
+          else
+            test "$GITHUB_REF_NAME" = main || { echo "run it on main"; exit 1; }
+            if git ls-remote --exit-code --tags origin "v$v" > /dev/null; then
+              echo "v$v is already tagged: bump the version first"; exit 1
+            fi
+          fi
       - run: npm run typecheck
       - run: npm test
       - run: npm publish --workspace packages/blue11 --provenance --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      # A tag pushed with GITHUB_TOKEN starts no workflow, so this doesn't publish twice.
+      - name: Tag the release
+        if: github.ref_type != 'tag'
+        run: |
+          git tag "${{ steps.version.outputs.tag }}"
+          git push origin "${{ steps.version.outputs.tag }}"

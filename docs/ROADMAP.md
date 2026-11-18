@@ -19,8 +19,8 @@ README as a departure from the original machine.
   npm workspaces, with a build to ESM plus types, an MIT licence, CI, and publishing to npm on a
   tag.
 
-1. **Publish 0.1.0:** the owner adds the `NPM_TOKEN` secret, then pushes the tag `v0.1.0`
-   (`.github/workflows/release.yml`). **Done when:** `npm install blue11` works.
+1. **Publish 0.1.0:** the `NPM_TOKEN` secret is set (2026-11-18), then "Release to npm" runs on
+   `main` (`.github/workflows/release.yml`) and tags `v0.1.0`. **Done when:** `npm install blue11` works.
 2. **HackCode uses the package** (in HackCode): depend on `blue11` ^0.1 and delete its
    `src/blue11/`, `tests/blue11/` and `src/simulator/`. **Done when:** HackCode's tests and build
    pass unchanged.
