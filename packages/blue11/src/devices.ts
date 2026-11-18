@@ -210,12 +210,25 @@ export class DeviceMachine implements Bus {
     }
   }
 
-  /** One instruction (or the interrupt waiting to be taken), with the devices kept in step. */
-  step(): RunResult {
+  /**
+   * One instruction (or the interrupt waiting to be taken), with the devices kept in step.
+   * On a CPU asleep in `WAIT`, time passes to the next device event that can wake it (at
+   * most `maxCycles`) and the interrupt is taken, as `run` would. Still asleep: reason
+   * `'wait'` with the cycles slept, 0 if no device can wake it or only host input can
+   * (and `maxCycles` is Infinity).
+   */
+  step(maxCycles = Infinity): RunResult {
     const r = this.cpu.step();
     this.instructions += r.instructions;
     this.advance(r.cycles);
-    return r;
+    if (r.reason !== 'wait' || r.instructions > 0 || !this.devices.some((d) => d.canWake?.())) return r;
+    const sleep = Math.max(0, Math.min(this.soonest('wakeIn'), maxCycles));
+    if (sleep === Infinity) return r;
+    this.advance(sleep);
+    const t = this.cpu.step();
+    this.instructions += t.instructions;
+    this.advance(t.cycles);
+    return { ...t, cycles: sleep + t.cycles };
   }
 
   private advance(cycles: number): void {
