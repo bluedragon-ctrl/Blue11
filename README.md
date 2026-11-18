@@ -32,8 +32,11 @@ console.log(m.output);      // HELLO
   recipes and pitfalls.
 - **The design:** [the machine](docs/BLUE11_MACHINE.md), and its devices: [a
   display](docs/BLUE11_DISPLAY.md) and [a keyboard](docs/BLUE11_KEYBOARD.md).
-- **What comes next:** [`docs/ROADMAP.md`](docs/ROADMAP.md), including a simulator in the
-  browser where students write programs that draw and read the keyboard.
+- **The simulator:** [bluedragon-ctrl.github.io/Blue11](https://bluedragon-ctrl.github.io/Blue11/),
+  in the browser: write programs that draw on a screen and read the keyboard, then step
+  through them with the registers, memory and disassembly in view
+  ([`apps/simulator`](apps/simulator/README.md)).
+- **What comes next:** [`docs/ROADMAP.md`](docs/ROADMAP.md).
 - **Used by:** [HackCode](https://github.com/bluedragon-ctrl/HackCode), a game where you program
   a robot in Blue-11 assembly.
 

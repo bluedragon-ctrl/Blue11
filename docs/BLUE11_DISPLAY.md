@@ -1,7 +1,7 @@
 # Blue-11 display: a memory-mapped graphics device
 
 Status: **built in the library** (`Display` and `Rom`, `blue11` 0.2.0, 2026-11-18). The
-simulator's ROM (§11) comes with the simulator. This device is part of the Blue-11
+simulator's ROM (§11) is built in the simulator (`apps/simulator/src/rom.mac`, 2026-11-18). This device is part of the Blue-11
 library, not of HackCode ([ROADMAP.md](ROADMAP.md)).
 Its first user is the standalone simulator for students. HackCode may add it later but does
 not need it.
@@ -400,7 +400,7 @@ routines, and then copy them into their own programs and change them.
   contents the host loads, where writes are bus errors (trap 4). This is HackCode's
   `Rom` (its `src/core/robot.ts`) made general, with its base and size as options, and HackCode then
   uses it. The ROM's *contents* (the font and the routines) belong to the simulator, not the
-  library (library rule 5): its source is `apps/simulator/rom.mac`, assembled when the page
+  library (library rule 5): its source is `apps/simulator/src/rom.mac`, assembled when the page
   loads.
 - **Layout** (`160000`–`167777`, 4 KB):
 
@@ -465,3 +465,13 @@ routines, and then copy them into their own programs and change them.
 - **The glyphs** are either drawn for Blue-11 or taken from a public-domain font, with the
   source and licence on the ROM source's first lines (§9). They are never copied
   from a proprietary ROM.
+- **As built** (2026-11-18, `apps/simulator`):
+  - In the ROM, the routines behind the jump table are labelled `DRAW0` and `DRAW1` (`DRAWCH`
+    and `DRAWC1` are the table's two `JMP`s). Programs get `DRAWCH`, `DRAWC1` and `FONT` as
+    predefined names.
+  - The glyphs are drawn for Blue-11 (`apps/simulator/src/font.ts`, MIT licence): 5 × 7
+    pixels in columns 1–5 of the cell, with descenders in row 7, so text has a gap of 3
+    pixels between characters and a blank row between lines.
+  - `DRAWC1` paints only the glyph's pixels too (it clears and sets one half of a byte at a
+    time), and takes the colour from the low 4 bits of R2.
+  - Measured with `A`: `DRAWCH` costs 382 cycles, `DRAWC1` 444 (call and return included).

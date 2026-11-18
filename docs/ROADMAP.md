@@ -30,18 +30,17 @@ README as a departure from the original machine.
    as in the spec, with live and scheduled input and an exact replay log, `keyCode`,
    `SimpleMachine({ keyboard })`, their tests (spec §10) and four keyboard examples, a README
    section, and the departure listed.
-4. **The simulator** (`apps/simulator`, deployed to GitHub Pages):
-   - Editing: CodeMirror with the library's highlighting, and assembler errors shown inline.
-   - Debugging: registers and flags, memory and disassembly, breakpoints, step / run / pause.
-   - Devices: the console, the display on a canvas, and the keyboard.
-   - Speed: a slider in frames per second of wall time (never cycles per frame), and a "Real
-     beam (tearing)" switch.
-   - The ROM, with the font, `DRAWCH` and `DRAWC1` (display spec §11), and its listing shown.
-   - Programs: the examples, programs saved in `localStorage` and shared by URL, and an input
-     log for replays.
-
-   **Done when:** every example program runs in the page, and the tests check the frames it
-   draws.
-5. **Later, if wanted:** a third display mode (such as 128 × 128 at 1 bpp), a mouse, more keys,
+4. ~~**The simulator**~~ (done, 2026-11-18, `apps/simulator`, deployed to GitHub Pages from
+   `main`): the editor with the library's highlighting, errors on their lines, breakpoints and
+   a heat bar; registers, flags, memory, stack, disassembly and the listing; Run / Continue /
+   Pause / Step / Step frame; the screen on a canvas, the keyboard and the console; speed in
+   frames per second of wall time and a "Real beam (tearing)" switch, plus EIS; the ROM
+   (`rom.mac`: an 8 × 8 font drawn for Blue-11, `DRAWCH`, `DRAWC1`) with its listing and three
+   showcase programs; the examples, programs saved in `localStorage`, share links, and an input
+   log with exact replays, saved to and opened from files. Every example runs in its tests as
+   the page runs it, and they check the frames it draws.
+5. **Help in the simulator:** the instructions, addressing modes, devices and the ROM's
+   routines, searchable, with help on the word under the cursor (as HackCode has).
+6. **Later, if wanted:** a third display mode (such as 128 × 128 at 1 bpp), a mouse, more keys,
    and a shared UI package for the debugger panels HackCode and the simulator have in common
    (extracted only once both exist).

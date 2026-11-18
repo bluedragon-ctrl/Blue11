@@ -1,0 +1,223 @@
+; The simulator's ROM: 160000-167777, 4 KB, read-only (docs/BLUE11_DISPLAY.md section 11).
+; An 8 x 8 font and two routines that draw it. Read them, call them, copy them
+; into your own program and change them.
+;
+; Copyright (c) 2026 the Blue-11 authors. MIT licence (see LICENSE). The font was
+; drawn for Blue-11 and is not copied from any other font or ROM.
+;
+; Calling either routine: R0 = the character, R1 = where its top left pixel goes,
+; R2 = the colour. Only the glyph's own pixels are painted. R1 moves on to the next
+; cell to the right; the other registers are unchanged.
+;     JSR  PC, @#DRAWCH       ; mode 0: R1 is the pixel's address, then R1 + 10
+;     JSR  PC, @#DRAWC1       ; mode 1: R1 is the pixel's byte (x even), then R1 + 4
+
+        .=160000
+; The jump table: these two addresses stay the same when the routines change.
+DRAWCH: JMP  DRAW0              ; 160000: draw a character in mode 0
+DRAWC1: JMP  DRAW1              ; 160004: draw a character in mode 1
+
+; DRAW0: mode 0, a byte per pixel, 100 bytes a row.
+DRAW0:  MOV  R0, -(SP)          ; keep the registers we use
+        MOV  R3, -(SP)
+        MOV  R4, -(SP)
+        MOV  R5, -(SP)
+        BIC  #177600, R0        ; 0-177 only
+        ASL  R0
+        ASL  R0
+        ASL  R0                 ; R0 * 10: the glyph's offset in the font
+        ADD  #FONT, R0          ; R0 = the glyph's top row
+        MOV  #10, R4            ; 8 rows
+1$:     MOVB (R0)+, R3          ; one row of the glyph: bit 7 is the leftmost pixel
+        MOV  #10, R5            ; 8 pixels
+2$:     ASLB R3                 ; the next pixel into C
+        BCC  3$                 ; 0: leave the pixel as it is
+        MOVB R2, (R1)           ; 1: paint it
+3$:     INC  R1                 ; one pixel to the right
+        SOB  R5, 2$             ; the rest of the row
+        ADD  #100-10, R1        ; one row down, back to the cell's left edge
+        SOB  R4, 1$             ; the next row
+        SUB  #1000-10, R1       ; back up 8 rows, and one cell to the right
+        MOV  (SP)+, R5          ; put the registers back
+        MOV  (SP)+, R4
+        MOV  (SP)+, R3
+        MOV  (SP)+, R0
+        RTS  PC                 ; back to the caller
+
+; DRAW1: mode 1, two pixels per byte (the left one in bits 3-0, the right one in
+; bits 7-4), 100 bytes a row. The same steps as DRAW0, two glyph bits per byte.
+DRAW1:  MOV  R0, -(SP)          ; keep the registers we use
+        MOV  R2, -(SP)
+        MOV  R3, -(SP)
+        MOV  R4, -(SP)
+        MOV  R5, -(SP)
+        BIC  #177760, R2        ; R2 = the colour, 0-17: a left pixel
+        MOV  R2, -(SP)          ; and on the stack, moved up 4 bits:
+        ASL  (SP)
+        ASL  (SP)
+        ASL  (SP)
+        ASL  (SP)               ; (SP) = the colour as a right pixel
+        BIC  #177600, R0        ; 0-177 only
+        ASL  R0
+        ASL  R0
+        ASL  R0                 ; R0 * 10: the glyph's offset in the font
+        ADD  #FONT, R0          ; R0 = the glyph's top row
+        MOV  #10, R4            ; 8 rows
+1$:     MOVB (R0)+, R3          ; one row of the glyph: bit 7 is the leftmost pixel
+        MOV  #4, R5             ; 4 bytes of 2 pixels
+2$:     ASLB R3                 ; the left pixel into C
+        BCC  3$                 ; 0: leave it
+        BICB #17, (R1)          ; 1: clear bits 3-0
+        BISB R2, (R1)           ; and paint it
+3$:     ASLB R3                 ; the right pixel into C
+        BCC  4$                 ; 0: leave it
+        BICB #360, (R1)         ; 1: clear bits 7-4
+        BISB (SP), (R1)         ; and paint it
+4$:     INC  R1                 ; the next byte: two pixels to the right
+        SOB  R5, 2$             ; the rest of the row
+        ADD  #100-4, R1         ; one row down, back to the cell's left edge
+        SOB  R4, 1$             ; the next row
+        SUB  #1000-4, R1        ; back up 8 rows, and one cell to the right
+        TST  (SP)+              ; drop the colour
+        MOV  (SP)+, R5          ; put the registers back
+        MOV  (SP)+, R4
+        MOV  (SP)+, R3
+        MOV  (SP)+, R2
+        MOV  (SP)+, R0
+        RTS  PC                 ; back to the caller
+
+; The font: character c is at FONT + c*10, 8 bytes, top row first, bit 7 the
+; leftmost pixel. Codes 0-37 and 177 are blank.
+        .=162000
+FONT:
+        .BYTE 000,000,000,000,000,000,000,000 ; 000 blank
+        .BYTE 000,000,000,000,000,000,000,000 ; 001 blank
+        .BYTE 000,000,000,000,000,000,000,000 ; 002 blank
+        .BYTE 000,000,000,000,000,000,000,000 ; 003 blank
+        .BYTE 000,000,000,000,000,000,000,000 ; 004 blank
+        .BYTE 000,000,000,000,000,000,000,000 ; 005 blank
+        .BYTE 000,000,000,000,000,000,000,000 ; 006 blank
+        .BYTE 000,000,000,000,000,000,000,000 ; 007 blank
+        .BYTE 000,000,000,000,000,000,000,000 ; 010 blank
+        .BYTE 000,000,000,000,000,000,000,000 ; 011 blank
+        .BYTE 000,000,000,000,000,000,000,000 ; 012 blank
+        .BYTE 000,000,000,000,000,000,000,000 ; 013 blank
+        .BYTE 000,000,000,000,000,000,000,000 ; 014 blank
+        .BYTE 000,000,000,000,000,000,000,000 ; 015 blank
+        .BYTE 000,000,000,000,000,000,000,000 ; 016 blank
+        .BYTE 000,000,000,000,000,000,000,000 ; 017 blank
+        .BYTE 000,000,000,000,000,000,000,000 ; 020 blank
+        .BYTE 000,000,000,000,000,000,000,000 ; 021 blank
+        .BYTE 000,000,000,000,000,000,000,000 ; 022 blank
+        .BYTE 000,000,000,000,000,000,000,000 ; 023 blank
+        .BYTE 000,000,000,000,000,000,000,000 ; 024 blank
+        .BYTE 000,000,000,000,000,000,000,000 ; 025 blank
+        .BYTE 000,000,000,000,000,000,000,000 ; 026 blank
+        .BYTE 000,000,000,000,000,000,000,000 ; 027 blank
+        .BYTE 000,000,000,000,000,000,000,000 ; 030 blank
+        .BYTE 000,000,000,000,000,000,000,000 ; 031 blank
+        .BYTE 000,000,000,000,000,000,000,000 ; 032 blank
+        .BYTE 000,000,000,000,000,000,000,000 ; 033 blank
+        .BYTE 000,000,000,000,000,000,000,000 ; 034 blank
+        .BYTE 000,000,000,000,000,000,000,000 ; 035 blank
+        .BYTE 000,000,000,000,000,000,000,000 ; 036 blank
+        .BYTE 000,000,000,000,000,000,000,000 ; 037 blank
+        .BYTE 000,000,000,000,000,000,000,000 ; 040 space
+        .BYTE 020,020,020,020,020,000,020,000 ; 041 !
+        .BYTE 050,050,050,000,000,000,000,000 ; 042 "
+        .BYTE 050,050,174,050,174,050,050,000 ; 043 #
+        .BYTE 020,074,120,070,024,170,020,000 ; 044 $
+        .BYTE 140,144,010,020,040,114,014,000 ; 045 %
+        .BYTE 060,110,120,040,124,110,064,000 ; 046 &
+        .BYTE 020,020,040,000,000,000,000,000 ; 047 '
+        .BYTE 010,020,040,040,040,020,010,000 ; 050 (
+        .BYTE 040,020,010,010,010,020,040,000 ; 051 )
+        .BYTE 000,020,124,070,124,020,000,000 ; 052 *
+        .BYTE 000,020,020,174,020,020,000,000 ; 053 +
+        .BYTE 000,000,000,000,000,060,020,040 ; 054 ,
+        .BYTE 000,000,000,174,000,000,000,000 ; 055 -
+        .BYTE 000,000,000,000,000,060,060,000 ; 056 .
+        .BYTE 000,004,010,020,040,100,000,000 ; 057 /
+        .BYTE 070,104,114,124,144,104,070,000 ; 060 0
+        .BYTE 020,060,020,020,020,020,070,000 ; 061 1
+        .BYTE 070,104,004,010,020,040,174,000 ; 062 2
+        .BYTE 174,010,020,010,004,104,070,000 ; 063 3
+        .BYTE 010,030,050,110,174,010,010,000 ; 064 4
+        .BYTE 174,100,170,004,004,104,070,000 ; 065 5
+        .BYTE 030,040,100,170,104,104,070,000 ; 066 6
+        .BYTE 174,004,010,020,040,040,040,000 ; 067 7
+        .BYTE 070,104,104,070,104,104,070,000 ; 070 8
+        .BYTE 070,104,104,074,004,010,060,000 ; 071 9
+        .BYTE 000,060,060,000,060,060,000,000 ; 072 :
+        .BYTE 000,060,060,000,060,020,040,000 ; 073 ;
+        .BYTE 010,020,040,100,040,020,010,000 ; 074 <
+        .BYTE 000,000,174,000,174,000,000,000 ; 075 =
+        .BYTE 040,020,010,004,010,020,040,000 ; 076 >
+        .BYTE 070,104,004,010,020,000,020,000 ; 077 ?
+        .BYTE 070,104,004,064,124,124,070,000 ; 100 @
+        .BYTE 070,104,104,174,104,104,104,000 ; 101 A
+        .BYTE 170,104,104,170,104,104,170,000 ; 102 B
+        .BYTE 070,104,100,100,100,104,070,000 ; 103 C
+        .BYTE 160,110,104,104,104,110,160,000 ; 104 D
+        .BYTE 174,100,100,170,100,100,174,000 ; 105 E
+        .BYTE 174,100,100,170,100,100,100,000 ; 106 F
+        .BYTE 070,104,100,134,104,104,074,000 ; 107 G
+        .BYTE 104,104,104,174,104,104,104,000 ; 110 H
+        .BYTE 070,020,020,020,020,020,070,000 ; 111 I
+        .BYTE 034,010,010,010,010,110,060,000 ; 112 J
+        .BYTE 104,110,120,140,120,110,104,000 ; 113 K
+        .BYTE 100,100,100,100,100,100,174,000 ; 114 L
+        .BYTE 104,154,124,124,104,104,104,000 ; 115 M
+        .BYTE 104,104,144,124,114,104,104,000 ; 116 N
+        .BYTE 070,104,104,104,104,104,070,000 ; 117 O
+        .BYTE 170,104,104,170,100,100,100,000 ; 120 P
+        .BYTE 070,104,104,104,124,110,064,000 ; 121 Q
+        .BYTE 170,104,104,170,120,110,104,000 ; 122 R
+        .BYTE 074,100,100,070,004,004,170,000 ; 123 S
+        .BYTE 174,020,020,020,020,020,020,000 ; 124 T
+        .BYTE 104,104,104,104,104,104,070,000 ; 125 U
+        .BYTE 104,104,104,104,104,050,020,000 ; 126 V
+        .BYTE 104,104,104,124,124,124,050,000 ; 127 W
+        .BYTE 104,104,050,020,050,104,104,000 ; 130 X
+        .BYTE 104,104,104,050,020,020,020,000 ; 131 Y
+        .BYTE 174,004,010,020,040,100,174,000 ; 132 Z
+        .BYTE 070,040,040,040,040,040,070,000 ; 133 [
+        .BYTE 000,100,040,020,010,004,000,000 ; 134 \
+        .BYTE 070,010,010,010,010,010,070,000 ; 135 ]
+        .BYTE 020,050,104,000,000,000,000,000 ; 136 ^
+        .BYTE 000,000,000,000,000,000,174,000 ; 137 _
+        .BYTE 040,020,010,000,000,000,000,000 ; 140 `
+        .BYTE 000,000,070,004,074,104,074,000 ; 141 a
+        .BYTE 100,100,130,144,104,104,170,000 ; 142 b
+        .BYTE 000,000,070,100,100,104,070,000 ; 143 c
+        .BYTE 004,004,064,114,104,104,074,000 ; 144 d
+        .BYTE 000,000,070,104,174,100,070,000 ; 145 e
+        .BYTE 030,044,040,160,040,040,040,000 ; 146 f
+        .BYTE 000,000,074,104,104,074,004,070 ; 147 g
+        .BYTE 100,100,130,144,104,104,104,000 ; 150 h
+        .BYTE 020,000,060,020,020,020,070,000 ; 151 i
+        .BYTE 010,000,030,010,010,010,110,060 ; 152 j
+        .BYTE 100,100,110,120,140,120,110,000 ; 153 k
+        .BYTE 060,020,020,020,020,020,070,000 ; 154 l
+        .BYTE 000,000,150,124,124,104,104,000 ; 155 m
+        .BYTE 000,000,130,144,104,104,104,000 ; 156 n
+        .BYTE 000,000,070,104,104,104,070,000 ; 157 o
+        .BYTE 000,000,170,104,104,170,100,100 ; 160 p
+        .BYTE 000,000,074,104,104,074,004,004 ; 161 q
+        .BYTE 000,000,130,144,100,100,100,000 ; 162 r
+        .BYTE 000,000,074,100,070,004,170,000 ; 163 s
+        .BYTE 040,040,160,040,040,044,030,000 ; 164 t
+        .BYTE 000,000,104,104,104,114,064,000 ; 165 u
+        .BYTE 000,000,104,104,104,050,020,000 ; 166 v
+        .BYTE 000,000,104,104,124,124,050,000 ; 167 w
+        .BYTE 000,000,104,050,020,050,104,000 ; 170 x
+        .BYTE 000,000,104,104,104,074,004,070 ; 171 y
+        .BYTE 000,000,174,010,020,040,174,000 ; 172 z
+        .BYTE 010,020,020,040,020,020,010,000 ; 173 {
+        .BYTE 020,020,020,020,020,020,020,000 ; 174 |
+        .BYTE 040,020,020,010,020,020,040,000 ; 175 }
+        .BYTE 000,000,040,124,010,000,000,000 ; 176 ~
+        .BYTE 000,000,000,000,000,000,000,000 ; 177 blank
+
+        .=164000
+; 164000-167777: free, kept for later.
+        .END
