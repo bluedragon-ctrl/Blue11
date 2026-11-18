@@ -62,12 +62,12 @@ describe('blue11 Keyboard: setup', () => {
   it('defaults', () => {
     const k = new Keyboard();
     expect([k.base, k.mapBase, k.vector, k.level, k.queueSize]).toEqual([0o176700, 0o177000, 0o330, 4, 16]);
-    expect([k.registers.base, k.registers.size, k.map.base, k.map.size]).toEqual([0o176700, 0o100, 0o177000, 0o200]);
+    expect([k.registers.base, k.registers.size, k.map.base, k.map.size]).toEqual([0o176700, 0o40, 0o177000, 0o200]);
   });
 
   it('host mistakes throw at setup', () => {
     expect(() => new Keyboard({ base: 0o176701 })).toThrow(/even/);
-    expect(() => new Keyboard({ base: 0o177740 })).toThrow(/registers/);
+    expect(() => new Keyboard({ base: 0o177760 })).toThrow(/registers/);
     expect(() => new Keyboard({ map: 0o177700 })).toThrow(/key map/);
     expect(() => new Keyboard({ queue: 0 })).toThrow(/queue/);
     expect(() => new Keyboard({ queue: 1.5 })).toThrow(/queue/);

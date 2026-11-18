@@ -11,7 +11,7 @@ for teaching, with a simulator for students in the browser
 | :--- | :--- | :--- |
 | `packages/blue11/` | the library, published to npm as `blue11` | [`packages/blue11/AGENTS.md`](packages/blue11/AGENTS.md): no imports from outside `src/`, no runtime dependencies, deterministic |
 | `apps/simulator/` | the student simulator, a Vite page deployed to GitHub Pages: [`apps/simulator/README.md`](apps/simulator/README.md) | a host like any other: it uses only the library's public API; its core (`src/sim.ts`) has no DOM and is tested |
-| `docs/` | the design: [machine](docs/BLUE11_MACHINE.md), [display](docs/BLUE11_DISPLAY.md), [keyboard](docs/BLUE11_KEYBOARD.md), [sound](docs/BLUE11_SOUND.md) (proposed), [roadmap](docs/ROADMAP.md) | update them when a design decision changes |
+| `docs/` | the design: [machine](docs/BLUE11_MACHINE.md), [display](docs/BLUE11_DISPLAY.md), [keyboard](docs/BLUE11_KEYBOARD.md), [sound](docs/BLUE11_SOUND.md), [roadmap](docs/ROADMAP.md) | update them when a design decision changes |
 
 ## Commands (at the root)
 

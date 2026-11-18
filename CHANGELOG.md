@@ -3,7 +3,30 @@
 The npm package `blue11` follows [semantic versioning](https://semver.org): before 1.0, a
 minor version may break the API, and a patch never does. The public API is everything
 exported from `blue11` and `blue11/codemirror`, plus the JSON form of saved states
-(`cpu.save()`, `display.state()`, `keyboard.state()`).
+(`cpu.save()`, `display.state()`, `keyboard.state()`, `sound.state()`).
+
+## 0.8.0 (2026-11-18)
+
+A sound device: a one-bit speaker (docs/BLUE11_SOUND.md).
+
+- New `Sound` device (`SND` has its addresses): `SNDCS` at `176740`, bit 0 the speaker (the
+  beeper), and `SNDDIV` at `176742`, the half period of a tone generator that switches the
+  speaker by itself (0: off; a new value takes effect at the next switch). No interrupt.
+  `RESET` silences it.
+- It makes no sound: `take()` returns the speaker's edges (`{ cycle, level }`) since the last
+  take, each at the exact cycle of the bus write that made it, and the host plays them. At most
+  `maxEdges` (65536) wait; past that the oldest are dropped. New types `Edge`, `SoundChunk`,
+  `SoundOptions`, `SoundState`.
+- `SimpleMachine({ sound: true })` adds it, in `sound`.
+- New `DeviceMachine.now`: the cycle of the bus access in progress (`cycles` plus, inside a run
+  or a step, `cpu.elapsed`, also new). `Device.attach` gets a second argument, a clock that
+  returns it. Existing devices are unaffected.
+- The keyboard's registers now cover `176700`–`176737` (the hole was up to `176777`), so the
+  sound device fits after them. `176740`–`176777` is still a bus error without it.
+- Examples: `SOUND_EXAMPLES` (a beeper note, a scale, a tune on the tone generator, playing
+  while drawing), and `SNDCS` / `SNDDIV` in `SIM_SYMBOLS`.
+- Simulator: the speaker plays at real time (60 frames a second), with volume and mute; a
+  Sound tab draws the last frame's waveform; the console beeps on BEL; a help page on sound.
 
 ## 0.7.0 (2026-11-18)
 

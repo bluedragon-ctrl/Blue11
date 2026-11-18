@@ -8,7 +8,7 @@ README as a departure from the original machine.
 
 - **The machine:** the CPU, assembler, disassembler, the device bus, DEC's console (DL11) and
   line clock (KW11-L). They were built in HackCode. Design: [`BLUE11_MACHINE.md`](BLUE11_MACHINE.md).
-- **Two device specs**, both decided on 2026-11-18:
+- **Device specs**, all decided on 2026-11-18 (the sound's in step 10):
   - The display, [`BLUE11_DISPLAY.md`](BLUE11_DISPLAY.md). Mode 0 is 64 × 64 with a byte per
     pixel; mode 1 is 128 × 128 with 4 bits per pixel. It has 16 colours from an RGB 3-3-3
     palette, a vertical-blank flag and interrupt, and an optional scanning beam that tears.
@@ -70,11 +70,12 @@ README as a departure from the original machine.
 9. ~~**Stepping through `WAIT`.**~~ (done, 2026-11-18, `blue11` 0.7.0): a step on a sleeping
    CPU advances the devices to the next event that can wake it (at most `maxCycles`), as `run`
    does, and takes the interrupt.
-10. **Sound: a one-bit speaker** (proposed 2026-11-18, [`BLUE11_SOUND.md`](BLUE11_SOUND.md)):
-    the owner decides §10 of the spec first. Then the `Sound` device in the library (a beeper
-    bit and a tone generator, edges recorded at the cycle of each write, which needs
-    `DeviceMachine.now`), its tests and examples, a README section and the departure listed;
-    then the simulator plays the edges with Web Audio at real time only.
+10. ~~**Sound: a one-bit speaker**~~ (done, 2026-11-18, `blue11` 0.8.0,
+    [`BLUE11_SOUND.md`](BLUE11_SOUND.md)): the `Sound` device (a beeper bit and a tone
+    generator, edges recorded at the cycle of each write through the new `DeviceMachine.now`),
+    its tests and four examples, a README section and the departure listed; in the simulator,
+    the speaker played with Web Audio at real time only, volume and mute, a Sound tab with the
+    last frame's waveform, the console's bell, and a help page.
 11. **Assembler messages for sizes.** Name the symbol and its line whenever a size depends on
     a later definition (the 0.4.0 fixes cover `.BLKW`, `. =` and register symbols; check every
     other place where pass 1 and pass 2 can disagree, and make "moved between passes" a

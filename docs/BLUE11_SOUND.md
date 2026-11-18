@@ -1,8 +1,9 @@
 # Blue-11 sound: a one-bit speaker
 
-Status: **proposed** (2026-11-18), waiting for the owner's decisions in §10. Nothing is built
-yet. Once decided, this device becomes a step in [ROADMAP.md](ROADMAP.md): first the library
-(`Sound`), then the simulator plays it. It is a teaching device, like the display
+Status: **built** (`Sound`, `blue11` 0.8.0, 2026-11-18), with every recommendation of §10
+accepted by the owner. The library records the speaker's edges; the simulator plays them, draws
+them in its Sound tab and rings the console's bell ([ROADMAP.md](ROADMAP.md) step 10). It is a
+teaching device, like the display
 ([`BLUE11_DISPLAY.md`](BLUE11_DISPLAY.md)) and the keyboard ([`BLUE11_KEYBOARD.md`](BLUE11_KEYBOARD.md)).
 
 ## 1. Goals
@@ -137,18 +138,19 @@ and tests compare it.
   instruction or of the run slice. Otherwise the beeper's pitch would depend on how the host
   slices a run. For `XOR R1, (R2)` this is its third cycle, the write. With `cycles: 'flat'` it
   is the cycle at which the instruction starts.
-- **The library needs one addition for this:** a device must be able to ask for the cycle of
-  the bus access in progress. Today devices only learn about time at the end of a slice
-  (`advance`). The proposal: `DeviceMachine.now`, the cycle of the access in progress (its
-  `cycles` plus the cycles already spent in the current `run` or `step`), handed to devices by
-  `attach`. It is a general addition (rule 5), and the scanning beam could use it later. It
-  changes no existing behaviour, so it is a minor version.
+- **The library's addition for this:** devices otherwise learn about time only at the end of
+  a run slice (`advance`). `DeviceMachine.now` is the cycle of the bus access in progress: its
+  `cycles` plus `cpu.elapsed`, the cycles the CPU has spent so far in the current `run` or
+  `step` up to that access's first cycle. `add` hands devices a clock that returns it, as the
+  second argument of `attach`. It is a general addition (rule 5), and the scanning beam could
+  use it later. It changes no existing behaviour.
 - The generator's edges are computed, not stepped: the device needs no `nextEvent()`, because
   nothing a program can see changes by itself. It never stops the CPU and never slows a run.
 - **The buffer is bounded.** The device keeps the edges since the host last took them, at most
   `maxEdges` (default 65536: more than six frames of the fastest switching a program can do, `MOV` of two registers in turn, 2 cycles each).
-  Past that, the oldest are dropped. A host that never takes them, such as HackCode, keeps only
-  the last ones.
+  Past that, the oldest are dropped, and the waiting stretch of time then starts at the oldest
+  edge kept. A host that never takes them, such as HackCode, keeps only the last ones; a
+  generator left running for hours skips ahead instead of computing every switch.
 
 ## 7. Host side
 
@@ -156,13 +158,14 @@ and tests compare it.
 const snd = new Sound({ base: 0o176740, maxEdges: 65536 });
 m.add(snd);
 
-snd.take();        // { from, to, level, edges }: the speaker from cycle `from` (at `level`)
-                   // to `to` (= m.cycles), with every edge in between; the buffer is emptied
+snd.take();        // { from, to, level, edges, dropped }: the speaker from cycle `from` (at
+                   // `level`) to `to` (= m.cycles), with every edge in between, and how many
+                   // were dropped; the buffer is emptied
 snd.level;         // the speaker now: 0 or 1
 ```
 
-- `take()` covers a stretch of time with no gaps: each call starts where the last one ended.
-  A host calls it after each frame.
+- `take()` covers a stretch of time with no gaps: each call starts where the last one ended
+  (unless edges were dropped). A host calls it after each frame.
 - The generator's edges up to `to` are included, computed from `SNDDIV` and the cycle it was
   last written.
 - `state()` and `load(state)` save and restore `OUT`, `SNDDIV`, the generator's phase and the
@@ -212,6 +215,7 @@ The library gives edges; the simulator makes them into sound with the Web Audio 
 
 | Addresses | What |
 | :--- | :--- |
+| `176700`–`176737` | the keyboard's registers and their hole ([`BLUE11_KEYBOARD.md`](BLUE11_KEYBOARD.md) §5) |
 | `176740`–`176743` | `SNDCS`, `SNDDIV` |
 | `176744`–`176777` | hole: bus error |
 
@@ -231,9 +235,9 @@ The rest of the map is in [`BLUE11_DISPLAY.md`](BLUE11_DISPLAY.md) §6 and
 playing. A `HALT` changes nothing in the device, but time stops with the CPU, so the host
 hears silence.
 
-## 10. Decisions for the owner
+## 10. Decisions
 
-Each has a recommendation; nothing is decided yet.
+The owner accepted every recommendation on 2026-11-18:
 
 1. **Add the device at all?** Recommended: yes, as above. It is small, it needs one general
    addition to the library (`now`, §6), and it makes cycle counting audible.

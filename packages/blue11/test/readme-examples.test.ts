@@ -211,6 +211,25 @@ WAITK:  TSTB @#177560       ; RCSR bit 7: a key?
     expect(log[0].cycle).toBeLessThan(520);
   });
 
+  it('sound', () => {
+    const m = new SimpleMachine({ sound: true });          // SNDCS at 176740, SNDDIV at 176742
+    m.boot(must(assemble(`
+        MOV  #176740, R2    ; SNDCS
+        MOV  #1, R1
+TONE:   XOR  R1, (R2)       ; 3 cycles: switch the speaker
+        MOV  #1358., R0     ; 2
+1$:     SOB  R0, 1$         ; 1358.
+        BR   TONE           ; 1: 1364 cycles a half period
+`)));
+    m.run(20_000);                                         // a frame
+    const chunk = m.sound!.take();                         // { from: 0, to, level: 0, edges, dropped: 0 }
+    const half = chunk.edges[1].cycle - chunk.edges[0].cycle;  // 1364
+
+    expect(half).toBe(1364);
+    expect(chunk).toMatchObject({ from: 0, level: 0, dropped: 0 });
+    expect(chunk.to).toBe(m.cycles);
+  });
+
   it('EMT result reached R0', () => {
     const m = new SimpleMachine();
     m.boot(must(assemble(' MOVB #1, R0\n EMT 7\n HALT')));

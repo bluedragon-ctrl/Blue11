@@ -22,5 +22,7 @@ export { Display, DSP, DEFAULT_PALETTE, rgb333to888, frameToRgba } from './displ
 export type { Beam, DisplayOptions, DisplayState, Frame } from './display.js';
 export { Keyboard, KBD, KEY, keyCode } from './keyboard.js';
 export type { Key, KeyboardOptions, KeyboardState, KeyEvent } from './keyboard.js';
+export { Sound, SND } from './sound.js';
+export type { Edge, SoundChunk, SoundOptions, SoundState } from './sound.js';
 export { SimpleMachine, DEV, CSR } from './machine.js';
 export type { MachineOptions } from './machine.js';

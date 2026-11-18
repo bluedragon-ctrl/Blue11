@@ -18,8 +18,12 @@ export interface Device {
   readonly base: number;
   /** Size in bytes (even). */
   readonly size: number;
-  /** Called once when added, with the CPU (to request interrupts). */
-  attach?(cpu: Cpu): void;
+  /**
+   * Called once when added, with the CPU (to request interrupts) and, from a
+   * {@link DeviceMachine}, a clock: the cycle of the bus access in progress
+   * ({@link DeviceMachine.now}), for a device that must know exactly when it is written.
+   */
+  attach?(cpu: Cpu, clock?: () => number): void;
   /** The word at an even `offset` from `base`, or {@link BUS_ERROR} for a hole. */
   read(offset: number): number;
   /**
@@ -93,9 +97,17 @@ export class DeviceMachine implements Bus {
     }
     this.devices.push(dev);
     this.slots.fill(this.devices.length, base >> 1, (base + size) >> 1);
-    dev.attach?.(this.cpu);
+    dev.attach?.(this.cpu, () => this.now);
     return this;
   }
+
+  /**
+   * The cycle now, counted from boot: {@link cycles}, plus, while the CPU is in `run` or
+   * `step`, the cycles it has spent so far up to the bus access in progress. A device reads
+   * it (through the clock `attach` gives it) to learn the exact cycle of a write, which
+   * `advance` only reports at the end of a run slice.
+   */
+  get now(): number { return this.cycles + this.cpu.elapsed; }
 
   // ---------------------------------------------------------------- Bus
 
