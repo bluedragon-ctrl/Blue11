@@ -20,5 +20,7 @@ export { DeviceMachine, DL11, KW11L, Rom } from './devices.js';
 export type { Device, DeviceMachineOptions, DL11Options, RomOptions } from './devices.js';
 export { Display, DSP, DEFAULT_PALETTE, rgb333to888, frameToRgba } from './display.js';
 export type { Beam, DisplayOptions, DisplayState, Frame } from './display.js';
+export { Keyboard, KBD, KEY, keyCode } from './keyboard.js';
+export type { Key, KeyboardOptions, KeyboardState, KeyEvent } from './keyboard.js';
 export { SimpleMachine, DEV, CSR } from './machine.js';
 export type { MachineOptions } from './machine.js';

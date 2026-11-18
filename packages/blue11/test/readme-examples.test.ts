@@ -188,6 +188,29 @@ WAITK:  TSTB @#177560       ; RCSR bit 7: a key?
     expect([...rgba.subarray(0, 4)]).toEqual([109, 0, 0, 255]) // red is 300: level 3;
   });
 
+  it('keyboard', () => {
+    const m = new SimpleMachine({ keyboard: true });   // queue at 176700, key map at 177000
+    m.boot(must(assemble(`
+1$:     TSTB @#176700       ; KBDCS: DONE when an event waits
+        BPL  1$
+        MOVB @#176702, R0   ; KBDBUF: take it (a release is negative)
+        BMI  1$             ; skip releases
+        MOVB @#177000+'Q, R1 ; the key map: is Q down? (200: yes)
+        HALT
+`)));
+    m.keyboard!.at(500, 'KeyQ', true);                 // press Q at cycle 500 (a KeyboardEvent.code, or KEY / a code)
+    m.run(10_000);                                     // R0 = 121 (Q), R1 = 177600 (200, sign-extended)
+    const log = m.keyboard!.log;                       // [{ cycle: 500 or a little later, code: 0o121, down: true }]
+
+    expect(m.cpu.halted).toBe(true);
+    expect(m.cpu.r[0]).toBe(0o121);
+    expect(m.cpu.r[1]).toBe(0o177600);
+    expect(log).toHaveLength(1);
+    expect(log[0]).toMatchObject({ code: 0o121, down: true });
+    expect(log[0].cycle).toBeGreaterThanOrEqual(500);
+    expect(log[0].cycle).toBeLessThan(520);
+  });
+
   it('EMT result reached R0', () => {
     const m = new SimpleMachine();
     m.boot(must(assemble(' MOVB #1, R0\n EMT 7\n HALT')));

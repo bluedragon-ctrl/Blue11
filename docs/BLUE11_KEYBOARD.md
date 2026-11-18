@@ -1,7 +1,7 @@
-# Blue-11 keyboard: keys for games (spec, not built)
+# Blue-11 keyboard: keys for games
 
-Status: **decided, not built** (2026-11-18). This device is part of the Blue-11
-library ([ROADMAP.md](ROADMAP.md)). Its first user is the
+Status: **built in the library** (`Keyboard`, `blue11` 0.3.0, 2026-11-18). This device is part of the Blue-11
+library ([ROADMAP.md](ROADMAP.md)); the decisions made while building it are in §7 under "Rules". Its first user is the
 standalone simulator, together with the display ([`BLUE11_DISPLAY.md`](BLUE11_DISPLAY.md)).
 
 ## 1. Goals
@@ -203,6 +203,25 @@ keyCode('KeyA');                           // 0o101: a browser KeyboardEvent.cod
   with a cycle in the past throws, because that is a host mistake.
 - `state()` and `load(state)` save and restore the key map, the queue, the registers and the
   scheduled events as plain data (library rule 3).
+
+**Rules** (decided while building it):
+
+- **Left and right.** `press` and `release` take a key code or a `KeyboardEvent.code`. The
+  device tells the two sides of a modifier apart only by their `KeyboardEvent.code`
+  (`'ShiftLeft'`, `'ShiftRight'`), so the host passes those strings. Every other key is its code,
+  however it was named: `press(0o101)` then `release('KeyA')` lets A go. A release by code lets
+  go of both sides. `releaseAll()` releases every key (for a blur).
+- **The 16 events include the one in `KBDBUF`.** With nothing read, 16 events are kept and the
+  17th is dropped.
+- **A request on every arrival** while `IE` is set, not only when the queue was empty. The CPU
+  keeps one request per vector, so this never doubles up; a handler that reads one event per
+  interrupt still sees them all.
+- **`at` with the current cycle** applies the event at once, like `press`.
+- **Power-up (`boot`) forgets the scheduled events and the log,** and the cycle count starts
+  again at 0 with the machine's. A replay schedules the log after `boot`.
+- Writing `KBDCS`: a word write sets `IE` from bit 6 and clears `OVR` if bit 15 is 0; a byte
+  write to the low byte sets only `IE`; a byte write to the high byte clears `OVR` if its bit 7
+  is 0.
 
 ### 7.1 In the simulator page
 

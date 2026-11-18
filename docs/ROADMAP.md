@@ -26,7 +26,10 @@ README as a departure from the original machine.
    as in the spec, with both beams, a general `Rom` device, `SimpleMachine({ display })`, their
    tests (spec §10) and six display examples, a README section, and the departure listed. Left
    for HackCode: replace its own `Rom` with the library's once it uses 0.2.0.
-3. **The keyboard in the library:** the same steps, from the keyboard spec.
+3. ~~**The keyboard in the library**~~ (done, 2026-11-18, `blue11` 0.3.0): the `Keyboard` device
+   as in the spec, with live and scheduled input and an exact replay log, `keyCode`,
+   `SimpleMachine({ keyboard })`, their tests (spec §10) and four keyboard examples, a README
+   section, and the departure listed.
 4. **The simulator** (`apps/simulator`, deployed to GitHub Pages):
    - Editing: CodeMirror with the library's highlighting, and assembler errors shown inline.
    - Debugging: registers and flags, memory and disassembly, breakpoints, step / run / pause.
