@@ -5,7 +5,7 @@ subset of its assembler syntax): the /40 model's set with the EIS option, an ass
 disassembler, a bus with pluggable memory-mapped devices, DEC's console and line clock, a
 read-only memory, a framebuffer display for teaching graphics, and a keyboard for games. No dependencies. MIT licence.
 Its first users are [HackCode](https://github.com/bluedragon-ctrl/HackCode), a game, and the Blue-11
-simulator (to come). Design and rationale: [`docs/BLUE11_MACHINE.md`](https://github.com/bluedragon-ctrl/Blue11/blob/main/docs/BLUE11_MACHINE.md);
+[simulator](https://bluedragon-ctrl.github.io/Blue11/). Design and rationale: [`docs/BLUE11_MACHINE.md`](https://github.com/bluedragon-ctrl/Blue11/blob/main/docs/BLUE11_MACHINE.md);
 the display: [`BLUE11_DISPLAY.md`](https://github.com/bluedragon-ctrl/Blue11/blob/main/docs/BLUE11_DISPLAY.md); the keyboard: [`BLUE11_KEYBOARD.md`](https://github.com/bluedragon-ctrl/Blue11/blob/main/docs/BLUE11_KEYBOARD.md).
 
 ```sh
