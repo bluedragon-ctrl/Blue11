@@ -11,7 +11,7 @@
  */
 
 import { BUS_ERROR, Cpu, PSW_ADDRESS, type Bus, type CpuOptions, type RunResult } from './cpu.js';
-import type { Program } from './assembler.js';
+import type { AssembleResult, Program } from './assembler.js';
 
 export interface Device {
   /** First bus address (even). */
@@ -48,6 +48,19 @@ export interface Device {
 export interface DeviceMachineOptions extends CpuOptions {
   /** Installed RAM in bytes from address 0 (default 56 KB: 000000–157777). */
   memory?: number;
+}
+
+/** Bytes of a program that {@link DeviceMachine.boot} did not load: `start` to `end` (exclusive). */
+export interface NotLoaded {
+  start: number;
+  end: number;
+  /** The source line they came from, when the program has its `lines`. */
+  line?: number;
+}
+
+export interface BootResult {
+  /** The parts of the program outside RAM, which were not loaded (empty: all of it was). */
+  notLoaded: NotLoaded[];
 }
 
 export class DeviceMachine implements Bus {
@@ -122,15 +135,39 @@ export class DeviceMachine implements Bus {
 
   // ---------------------------------------------------------------- host side
 
-  /** Clear memory, power the devices up, load an assembled program, then {@link start} it. */
-  boot(asm: Program): void {
+  /**
+   * Clear memory, power the devices up, load an assembled program, then {@link start} it.
+   * Only RAM is loaded: the parts of the program outside it (in the I/O page, or in a ROM) are
+   * left out and listed in the result, as {@link notLoaded} gives them.
+   */
+  boot(asm: Program): BootResult {
     this.ram.fill(0);
     this.cpu.reset();
     for (const d of this.devices) d.reset?.(true);
     this.cycles = 0;
     this.instructions = 0;
-    this.ram.set(asm.bytes.subarray(0, Math.max(0, this.ram.length - asm.origin)), asm.origin);
+    if (asm.origin < this.ram.length) this.ram.set(asm.bytes.subarray(0, this.ram.length - asm.origin), asm.origin);
     this.start(asm);
+    return { notLoaded: this.notLoaded(asm) };
+  }
+
+  /**
+   * The parts of `asm` that {@link boot} would not load because they are outside RAM. With the
+   * program's `lines` (an {@link AssembleResult} has them), one range for each line with bytes
+   * past RAM, with its line; without them, one range from the end of RAM (or the origin) to the
+   * end of the program, gaps included.
+   */
+  notLoaded(asm: Program): NotLoaded[] {
+    const top = this.ram.length;
+    const end = asm.origin + asm.bytes.length;
+    if (end <= top) return [];
+    if (!asm.lines) return [{ start: Math.max(top, asm.origin), end }];
+    const out: NotLoaded[] = [];
+    for (const l of asm.lines) {
+      const e = l.address + l.bytes.length;
+      if (l.bytes.length && e > top) out.push({ start: Math.max(top, l.address), end: e, line: l.line });
+    }
+    return out;
   }
 
   /**
