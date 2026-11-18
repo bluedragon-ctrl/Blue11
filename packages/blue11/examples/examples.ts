@@ -1,13 +1,16 @@
 /**
- * Example programs for a `SimpleMachine` (DL11 console, KW11-L clock). The standalone
- * simulator (docs/ROADMAP.md) shows them; test/examples.test.ts runs each one and checks it prints `expect`.
+ * Example programs for a `SimpleMachine` (DL11 console, KW11-L clock, and for
+ * `DISPLAY_EXAMPLES` the display). The standalone simulator (docs/ROADMAP.md) shows them;
+ * test/examples.test.ts runs each one and checks it prints `expect`, and
+ * test/display.test.ts checks the frames the display examples draw.
  */
 
-import { DEV, PSW_ADDRESS } from '../src/index.js';
+import { DEV, DSP, PSW_ADDRESS, type Beam } from '../src/index.js';
 
-/** Device register names the examples use (DL11 console, KW11-L clock). */
+/** Device register names the examples use (DL11 console, KW11-L clock, display). */
 export const SIM_SYMBOLS: Record<string, number> = {
   RCSR: DEV.RCSR, RBUF: DEV.RBUF, XCSR: DEV.XCSR, XBUF: DEV.XBUF, LKS: DEV.LKS, PSW: PSW_ADDRESS,
+  SCREEN: DSP.SCREEN, DSPCS: DSP.DSPCS, DSPFRM: DSP.DSPFRM, DSPLIN: DSP.DSPLIN, DSPPAL: DSP.DSPPAL, DSPVEC: DSP.VEC,
 };
 
 export interface Example {
@@ -297,6 +300,257 @@ TAB:    .WORD ONE, SEVEN, 3     ; two pointers and a number
 ONE:    .WORD 1                 ; a word holding 1
 SEVEN:  .WORD 7                 ; a word holding 7
         .END START
+`,
+  },
+];
+
+// -------------------------------------------------------------------- the display
+
+export interface DisplayExample {
+  name: string;
+  source: string;
+  /** The beam the example needs (default 'instant'). */
+  beam?: Beam;
+}
+
+/** VSYNC, as in docs/BLUE11_DISPLAY.md §4. */
+export const VSYNC = `
+; VSYNC: wait for the next vertical blank.
+VSYNC:  BIC  #200, @#DSPCS      ; forget a blank we may already have seen
+1$:     TSTB @#DSPCS            ; DONE? (bit 7 is the sign of the low byte)
+        BPL  1$                 ; not yet
+        RTS  PC                 ; back to the caller`;
+
+/** FLIP, as in docs/BLUE11_DISPLAY.md §5 (mode 0, pages 0 and 1). */
+export const FLIP = `
+; FLIP: show the page we just drew; R1 = the page to draw on next.
+FLIP:   BIT  #1, @#DSPCS        ; showing page 1?
+        BNE  1$                 ; yes
+        BIS  #1, @#DSPCS        ; no: show page 1 from the next blank on
+        MOV  #120000, R1        ; and draw on page 0
+        BR   VSYNC              ; VSYNC returns to our caller
+1$:     BIC  #1, @#DSPCS        ; yes: show page 0
+        MOV  #130000, R1        ; and draw on page 1
+        BR   VSYNC              ; VSYNC returns to our caller`;
+
+/** PLOT1, as in docs/BLUE11_DISPLAY.md §3 (mode 1). */
+export const PLOT1 = `
+; PLOT1: set pixel (R2 = x, R3 = y) to colour R0 (0–17) in mode 1, on the page at R1.
+PLOT1:  MOV  R3, R4             ; y
+        SWAB R4                 ; y * 400 (y is less than 200, so it fits)
+        ASR  R4                 ; y * 200
+        ASR  R4                 ; y * 100: the row's offset
+        ADD  R1, R4             ; + the page
+        MOV  R2, R5             ; x
+        ASR  R5                 ; x / 2: the byte in the row
+        ADD  R5, R4             ; R4 = the byte's address
+        BIT  #1, R2             ; odd x?
+        BNE  1$                 ; yes
+        BICB #17, (R4)          ; even x: replace the low half
+        BISB R0, (R4)           ; with the colour
+        RTS  PC                 ; back to the caller
+1$:     BICB #360, (R4)         ; odd x: replace the high half
+        MOV  R0, R5             ; the colour
+        ASL  R5                 ; moved left...
+        ASL  R5                 ;
+        ASL  R5                 ;
+        ASL  R5                 ; ...to bits 7–4
+        BISB R5, (R4)           ; into the high half
+        RTS  PC                 ; back to the caller`;
+
+/** Sky colours, top band first (the 'Sky gradient' example). */
+export const SKY = [0o001, 0o002, 0o003, 0o004, 0o005, 0o006, 0o007, 0o077];
+
+export const DISPLAY_EXAMPLES: DisplayExample[] = [
+  {
+    name: 'Diagonal (mode 0)',
+    source: `
+; A white diagonal from the top left to the bottom right. One row down
+; is +100 and one pixel right is +1, so the next pixel is always +101.
+        MOV  #SCREEN, R1        ; pixel (0, 0)
+        MOV  #100, R2           ; 64 pixels
+1$:     MOVB #17, (R1)          ; colour 17: white
+        ADD  #101, R1           ; one row down, one pixel right
+        SOB  R2, 1$             ; the next pixel
+        JSR  PC, VSYNC          ; wait for the blank: the picture is shown
+        HALT                    ; stop the CPU
+${VSYNC}
+`,
+  },
+  {
+    name: 'Filled rectangle (mode 0)',
+    source: `
+; A red rectangle, 20 by 20 pixels, with its top left corner at (10, 20).
+; Each word is two pixels: 4 * 400 + 4 = 2004.
+        MOV  #SCREEN+2010, R1   ; (10, 20): row 20, column 10
+        MOV  #20, R3            ; 20 rows
+1$:     MOV  #10, R2            ; 10 words = 20 pixels in each row
+2$:     MOV  #2004, (R1)+       ; two red pixels
+        SOB  R2, 2$             ; the rest of the row
+        ADD  #100-20, R1        ; the next row, back to column 10
+        SOB  R3, 1$             ; the next row
+        JSR  PC, VSYNC          ; wait for the blank: the picture is shown
+        HALT                    ; stop the CPU
+${VSYNC}
+`,
+  },
+  {
+    name: 'Bouncing pixel (double buffering)',
+    source: `
+; A yellow pixel bounces off the edges. Each frame is drawn on the page
+; that is not shown, then FLIP shows it: the picture never flickers.
+        MOV  #130000, R1        ; draw on page 1 first (page 0 is shown)
+        CLR  R2                 ; x = 0
+        MOV  #5, R3             ; y = 5
+LOOP:   MOV  R1, R4             ; clear the page we draw on
+        MOV  #4000, R5          ; 4000 words
+1$:     CLR  (R4)+              ; two pixels
+        SOB  R5, 1$             ; the rest of the page
+        ADD  DX, R2             ; move x
+        TST  R2                 ; at the left edge?
+        BEQ  2$                 ; yes: bounce
+        CMP  R2, #77            ; at the right edge?
+        BNE  3$                 ; no
+2$:     NEG  DX                 ; bounce: go the other way
+3$:     ADD  DY, R3             ; move y
+        TST  R3                 ; at the top?
+        BEQ  4$                 ; yes: bounce
+        CMP  R3, #77            ; at the bottom?
+        BNE  5$                 ; no
+4$:     NEG  DY                 ; bounce
+5$:     MOV  R3, R4             ; the pixel's address: y
+        SWAB R4                 ; y * 400
+        ASR  R4                 ; y * 200
+        ASR  R4                 ; y * 100
+        ADD  R2, R4             ; + x
+        ADD  R1, R4             ; + the page
+        MOVB #16, (R4)          ; colour 16: yellow
+        JSR  PC, FLIP           ; show it; R1 = the next page to draw on
+        DEC  COUNT              ; one frame less to go
+        BNE  LOOP               ; the next frame
+        HALT                    ; stop the CPU
+DX:     .WORD 1                 ; the step in x: +1 or -1
+DY:     .WORD 1                 ; the step in y
+COUNT:  .WORD 50.               ; frames to draw
+${FLIP}
+${VSYNC}
+`,
+  },
+  {
+    name: 'Circle (mode 1, PLOT1)',
+    source: `
+; A white circle of radius 50. (decimal) around (100, 100), with the
+; midpoint algorithm: only additions, and one PLOT1 for each of the 8 octants.
+        BIS  #4, @#DSPCS        ; mode 1 (128 x 128) from the next blank on
+        MOV  #SCREEN, R1        ; draw on page 0
+        MOV  #17, R0            ; colour 17: white
+        MOV  #50., XX           ; x = the radius
+        CLR  YY                 ; y = 0
+        MOV  #-49., DD          ; d = 1 - the radius
+LOOP:   CMP  XX, YY             ; x >= y?
+        BLT  DONE               ; no: the circle is complete
+        JSR  PC, PLOT8          ; plot the 8 mirror images of (x, y)
+        INC  YY                 ; y = y + 1
+        TST  DD                 ; d < 0?
+        BGE  1$                 ; no: x moves in too
+        ADD  YY, DD             ; d = d + 2y + 1
+        ADD  YY, DD             ;
+        INC  DD                 ;
+        BR   LOOP               ; the next point
+1$:     DEC  XX                 ; x = x - 1
+        MOV  YY, R4             ; d = d + 2(y - x) + 1
+        SUB  XX, R4             ;
+        ASL  R4                 ;
+        INC  R4                 ;
+        ADD  R4, DD             ;
+        BR   LOOP               ; the next point
+DONE:   JSR  PC, VSYNC          ; wait for the blank: the picture is shown
+        HALT                    ; stop the CPU
+XX:     .WORD 0                 ; x
+YY:     .WORD 0                 ; y
+DD:     .WORD 0                 ; the midpoint test
+
+; PLOT8: plot (100 +- x, 100 +- y) and (100 +- y, 100 +- x).
+PLOT8:  MOV  XX, R2             ; a = x
+        MOV  YY, R3             ; b = y
+        JSR  PC, QUAD           ; the four points (100 +- a, 100 +- b)
+        MOV  YY, R2             ; a = y
+        MOV  XX, R3             ; b = x
+        JSR  PC, QUAD           ; and the other four
+        RTS  PC                 ; back to the caller
+
+; QUAD: plot (100 + a, 100 + b) and its mirror images; a in R2, b in R3.
+QUAD:   ADD  #100, R2           ; x = 100 + a
+        ADD  #100, R3           ; y = 100 + b
+        JSR  PC, PLOT1          ; (100 + a, 100 + b)
+        NEG  R2                 ; mirror x: 200 - x
+        ADD  #200, R2           ; x = 100 - a
+        JSR  PC, PLOT1          ; (100 - a, 100 + b)
+        NEG  R3                 ; mirror y
+        ADD  #200, R3           ; y = 100 - b
+        JSR  PC, PLOT1          ; (100 - a, 100 - b)
+        NEG  R2                 ; mirror x again
+        ADD  #200, R2           ; x = 100 + a
+        JSR  PC, PLOT1          ; (100 + a, 100 - b)
+        RTS  PC                 ; back to the caller
+${PLOT1}
+${VSYNC}
+`,
+  },
+  {
+    name: 'Palette cycling',
+    source: `
+; Sixteen stripes, one in each colour. The pixels never change: the
+; program rotates palette entries 1-17 once a frame, so the stripes move.
+        MOV  #SCREEN, R1        ; the top left pixel
+        MOV  #100, R3           ; 100 rows
+1$:     CLR  R0                 ; colour 0 at the left
+        MOV  #20, R2            ; 20 stripes
+2$:     MOVB R0, (R1)+          ; 4 pixels of this colour
+        MOVB R0, (R1)+          ;
+        MOVB R0, (R1)+          ;
+        MOVB R0, (R1)+          ;
+        INC  R0                 ; the next colour
+        SOB  R2, 2$             ; the next stripe
+        SOB  R3, 1$             ; the next row
+        MOV  #20., R3           ; 20. frames
+CYCLE:  MOV  @#DSPPAL+2, R0     ; keep entry 1
+        MOV  #DSPPAL+2, R1      ; from entry 1...
+        MOV  #16, R2            ; ...16 entries move down by one
+3$:     MOV  2(R1), (R1)+       ; entry n = entry n+1
+        SOB  R2, 3$             ; the next entry
+        MOV  R0, (R1)           ; entry 17 = the old entry 1
+        JSR  PC, VSYNC          ; show it
+        SOB  R3, CYCLE          ; the next frame
+        HALT                    ; stop the CPU
+${VSYNC}
+`,
+  },
+  {
+    name: 'Sky gradient (racing the beam)',
+    beam: 'scan',
+    source: `
+; Needs the real beam. The whole screen is colour 1, yet it shows 10
+; bands: the program changes palette entry 1 as the beam goes down.
+        MOV  #SCREEN, R1        ; fill the page with colour 1
+        MOV  #4000, R2          ; 4000 words
+1$:     MOV  #401, (R1)+        ; two pixels of colour 1
+        SOB  R2, 1$             ; the rest of the page
+        MOV  #3, R3             ; 3 frames
+FRAME:  JSR  PC, VSYNC          ; the blank: the beam will start at row 0
+        MOV  #SKY, R1           ; the band colours
+        CLR  R2                 ; the band's first row
+2$:     CMP  @#DSPLIN, R2       ; the beam on that row yet?
+        BNE  2$                 ; not yet
+        MOV  (R1)+, @#DSPPAL+2  ; colour 1 = this band's colour
+        ADD  #10, R2            ; the next band starts 10 rows further down
+        CMP  R2, #100           ; was that the last band?
+        BLO  2$                 ; no: wait for the next
+        SOB  R3, FRAME          ; the next frame
+        JSR  PC, VSYNC          ; let the last frame be shown
+        HALT                    ; stop the CPU
+SKY:    .WORD ${SKY.map((c) => c.toString(8).padStart(3, '0')).join(', ')} ; dark blue to light
+${VSYNC}
 `,
   },
 ];

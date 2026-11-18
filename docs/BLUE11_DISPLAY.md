@@ -1,6 +1,7 @@
-# Blue-11 display: a memory-mapped graphics device (spec, not built)
+# Blue-11 display: a memory-mapped graphics device
 
-Status: **decided, not built** (2026-11-18). This device is part of the Blue-11
+Status: **built in the library** (`Display` and `Rom`, `blue11` 0.2.0, 2026-11-18). The
+simulator's ROM (§11) comes with the simulator. This device is part of the Blue-11
 library, not of HackCode ([ROADMAP.md](ROADMAP.md)).
 Its first user is the standalone simulator for students. HackCode may add it later but does
 not need it.
@@ -209,7 +210,8 @@ Index 0 is black, so a cleared screen is black in both modes.
 
   The same routine works in mode 1 with `140000` in place of `130000`, the size of its page.
 - **Device rules** (`Device` in `devices.ts`): `nextEvent()` returns the cycles until the next
-  blank, so a polling program sees `DONE` on time. `wakeIn()` returns the same number when `IE`
+  blank or the next change of `DSPLIN` (§5.1), whichever comes first, in both beam settings, so
+  a polling program sees `DONE` and `DSPLIN` on time. `wakeIn()` returns the same number when `IE`
   is set, otherwise Infinity. `canWake()` is `IE`.
 - **The line clock in the simulator** ticks once per frame (`KW11L(frameCycles)`), so it runs at
   60 Hz, like a real line clock.
@@ -226,13 +228,14 @@ like that. The default, `beam: 'instant'`, does not tear.
 - **The beam's timing is the same in both settings.** A frame of `frameCycles` cycles starts
   with the **vertical blank**, which lasts `blankCycles` cycles (default `frameCycles / 8`,
   2500). During the blank the beam reads nothing. After it, the beam reads the H rows (64 or 128)
-  evenly over the rest of the frame: row r at cycle `blankCycles + floor(r * (frameCycles -
-  blankCycles) / H)` after the start of the blank. `DSPLIN` shows where the beam is in either
-  setting.
+  evenly over the rest of the frame: it is on row r from cycle `T(r) = blankCycles + floor(r *
+  (frameCycles - blankCycles) / H)` after the start of the blank until `T(r + 1)` (`T(H)` is
+  `frameCycles`, the next blank). `DSPLIN` shows the row the beam is on in either setting.
 - **Instant beam (default):** the whole page and the palette are latched at the start of the
   blank (§5). `DSPLIN` is only information.
-- **Scanning beam:** each row is latched **when the beam reads it**, with the palette as it is at
-  that moment. The picture composed this way is handed to the host at the next blank. `PAGE`
+- **Scanning beam:** each row is latched **when the beam has passed it**, at `T(r + 1)`, with the
+  palette as it is at that moment. So a change made while `DSPLIN` reads r still shows on row r,
+  and the last row is latched at the blank. The picture composed this way is handed to the host at the next blank. `PAGE`
   and `MODE` are still latched only at the blank, so a picture never mixes two pages.
 - **What it teaches:**
   - *Draw during the blank.* After `VSYNC`, the program has `blankCycles` cycles before the beam
@@ -242,8 +245,8 @@ like that. The default, `beam: 'instant'`, does not tear.
   - *Racing the beam.* Changing a palette entry when `DSPLIN` reaches a row gives a different
     colour from that row on, for sky gradients and stripes: a classic trick, and timing to the
     cycle.
-- **Rules.** In the scanning setting, `nextEvent()` returns the cycles until the next row read,
-  so the CPU stops for each row and the latch sees memory as it was at that cycle. The CPU only
+- **Rules.** `nextEvent()` returns the cycles until the beam moves to the next row (or the
+  blank comes), so the CPU stops for each row and the latch sees memory as it was at that cycle. The CPU only
   stops between instructions, so a row is latched up to one instruction late. Because of this,
   a picture depends only on the program and the options, never on the host. The machine stops
   once per row, at most 128 times a frame: cheap.
@@ -293,23 +296,26 @@ like that. The default, `beam: 'instant'`, does not tear.
 
 ```ts
 const display = new Display({
-  memory: 0o120000,       // pixel window base (16 KB, 16 KB-aligned)
+  memory: 0o120000,       // pixel memory base (16 KB, at a multiple of 020000)
   base: 0o176600,         // registers
   vector: 0o320, level: 4,
   frameCycles: 20000,
   blankCycles: 2500,      // default frameCycles / 8
-  beam: 'instant',        // or 'scan': rows latched as the beam reads them (§5.1)
+  beam: 'instant',        // or 'scan': rows latched as the beam passes them (§5.1)
 });
 const m = new SimpleMachine({ memory: 0o120000, clockCycles: 20000 });
 m.add(display.memory).add(display.control);
+// or simply: new SimpleMachine({ display: true }) or ({ display: { beam: 'scan' } }); then m.display
 
 display.onFrame = (f) => draw(f);   // called at each vertical blank
 // f.width, f.height: 64 or 128 (the mode latched with this frame)
 // f.pixels:  Uint8Array(width * height), colour indexes 0–17, row by row
-// f.palette: Uint16Array(16), RGB 3-3-3
+// f.palette: Uint16Array(16 * height), RGB 3-3-3: the palette each row was latched with,
+//            row y's 16 entries at 16 * y (all rows alike with the instant beam)
 // f.number:  the DSPFRM value
-display.frame;                      // the last latched frame (the same object)
+display.frame;                      // the last latched frame (the same object; a new one each blank)
 rgb333to888(0o770);                 // [255, 255, 0]; each 0–7 maps through 0,44,111,155,222,266,333,377 (octal)
+frameToRgba(display.frame);         // RGBA bytes for a canvas ImageData
 ```
 
 - The host runs the machine one frame at a time (`m.run(frameCycles)` per animation frame, or
@@ -318,10 +324,13 @@ rgb333to888(0o770);                 // [255, 255, 0]; each 0–7 maps through 0,
 - `display.state()` and `display.load(state)` save and restore the device as plain data:
   registers, palette, pixel memory, the latched frame and the cycles until the next blank. This
   follows library rule 3, "states survive JSON".
-- Mistakes by the host throw at setup, for example a window that is not aligned to 16 KB or one
-  that overlaps RAM. Faults in the program are traps, as with every device.
-- **A possible `SimpleMachine` option:** `display: true` sets this map and these defaults, so
-  simple hosts need not repeat them. It is general and not host-specific, so rule 5 allows it.
+- **Per-row palettes** (decided while building it): racing the beam changes the palette between
+  rows, so one palette per frame could not describe the picture.
+- Mistakes by the host throw at setup, for example pixel memory that does not start at a
+  multiple of `020000` (8 KB: its pages must line up), or one that overlaps RAM. Faults in the program are traps, as with every device.
+- **The `SimpleMachine` option** `display: true` (or `DisplayOptions`) sets this map and these
+  defaults, so simple hosts need not repeat them. It is general and not host-specific, so rule 5
+  allows it.
 
 ## 9. Decisions
 

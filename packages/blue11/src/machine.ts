@@ -9,25 +9,36 @@
  */
 
 import { CSR, DEV, DeviceMachine, DL11, KW11L, type DeviceMachineOptions } from './devices.js';
+import { Display, type DisplayOptions } from './display.js';
 
 export { CSR, DEV };
 
 export interface MachineOptions extends DeviceMachineOptions {
-  /** CPU cycles per line-clock tick (default 1000). */
+  /** CPU cycles per line-clock tick (default 1000, or the display's `frameCycles`). */
   clockCycles?: number;
+  /**
+   * Add a {@link Display} (`true`: the defaults). RAM then ends where its pixel window
+   * starts (default 120000), and the line clock ticks once per frame, unless you say otherwise.
+   */
+  display?: boolean | DisplayOptions;
 }
 
 export class SimpleMachine extends DeviceMachine {
   readonly clockCycles: number;
   readonly console: DL11;
   readonly clock: KW11L;
+  /** The display, if the `display` option asked for one. */
+  readonly display: Display | null;
 
   constructor(opts: MachineOptions = {}) {
-    super(opts);
-    this.clockCycles = opts.clockCycles ?? 1000;
+    const display = opts.display ? new Display(opts.display === true ? {} : opts.display) : null;
+    super({ ...opts, memory: opts.memory ?? display?.memoryBase });
+    this.display = display;
+    this.clockCycles = opts.clockCycles ?? display?.frameCycles ?? 1000;
     this.console = new DL11();
     this.clock = new KW11L(this.clockCycles);
     this.add(this.console).add(this.clock);
+    if (display) this.add(display.memory).add(display.control);
   }
 
   /** Everything written to the console (XBUF). */

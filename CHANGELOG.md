@@ -3,7 +3,19 @@
 The npm package `blue11` follows [semantic versioning](https://semver.org): before 1.0, a
 minor version may break the API, and a patch never does. The public API is everything
 exported from `blue11` and `blue11/codemirror`, plus the JSON form of saved states
-(`cpu.save()`).
+(`cpu.save()`, `display.state()`).
+
+## 0.2.0 (2026-11-18)
+
+- `Display`: the Blue-11 framebuffer (docs/BLUE11_DISPLAY.md). Pixel memory at `120000`, registers
+  at `176600`, vector `320`; modes 0 (64 × 64) and 1 (128 × 128), 16 colours from a palette, a
+  frame every 20000 cycles, and an optional scanning beam (`beam: 'scan'`) that tears. Frames
+  are handed to the host as colour indexes with a palette per row; `state()` / `load()`.
+  Also `DSP`, `DEFAULT_PALETTE`, `rgb333to888`, `frameToRgba`.
+- `Rom`: read-only memory whose contents the host loads; writes are bus errors.
+- `SimpleMachine({ display })` adds a display (RAM then ends at `120000`, and the clock ticks
+  once a frame).
+- Display example programs (`DISPLAY_EXAMPLES` in `examples/examples.ts`, not part of the API).
 
 ## 0.1.0 (2026-11-18)
 

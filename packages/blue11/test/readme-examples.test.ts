@@ -7,7 +7,7 @@ import { describe, expect, it } from 'vitest';
 import readme from '../README.md?raw';
 import here from './readme-examples.test.ts?raw';
 import {
-  assemble, BUS_ERROR, Cpu, DeviceMachine, disassemble, octal, SimpleMachine,
+  assemble, BUS_ERROR, Cpu, DeviceMachine, disassemble, frameToRgba, octal, SimpleMachine,
   type AssembleResult, type Bus, type Device,
 } from '../src/index.js';
 import { formatErrors } from './helpers/asm';
@@ -166,6 +166,26 @@ WAITK:  TSTB @#177560       ; RCSR bit 7: a key?
     expect(m.cpu.r[7]).toBe(asm.symbols.get('WAITK'));
     expect(lines[1]).toBe('001004  TSTB @#177560');
     expect(lines[2]).toBe('001010  BPL WAITK');
+  });
+
+  it('display', () => {
+    const m = new SimpleMachine({ display: true });     // RAM to 117777, display at 120000 / 176600
+    m.boot(must(assemble(`
+        MOVB #4, @#120000   ; a red pixel at (0, 0)
+        MOV  #1403, @#123412 ; two cyan pixels at (12, 34) and (13, 34)
+1$:     TSTB @#176600       ; DSPCS: DONE comes at the vertical blank
+        BPL  1$
+        HALT
+`)));
+    m.run(100_000);                                     // halts just after the first blank
+    const f = m.display!.frame;                         // { width: 64, height: 64, pixels, palette, number: 1 }
+    const rgba = frameToRgba(f);                        // RGBA bytes, row by row, for a canvas ImageData
+
+    expect(m.cpu.halted).toBe(true);
+    expect(f).toMatchObject({ width: 64, height: 64, number: 1 });
+    expect(f.pixels[0]).toBe(4);
+    expect([f.pixels[0o34 * 64 + 0o12], f.pixels[0o34 * 64 + 0o13]]).toEqual([3, 3]);
+    expect([...rgba.subarray(0, 4)]).toEqual([109, 0, 0, 255]) // red is 300: level 3;
   });
 
   it('EMT result reached R0', () => {

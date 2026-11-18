@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { assemble, BUS_ERROR, DeviceMachine, DL11, KW11L, SimpleMachine, type Cpu, type Device } from '../src/index.js';
+import { assemble, BUS_ERROR, DeviceMachine, DL11, KW11L, Rom, SimpleMachine, type Cpu, type Device } from '../src/index.js';
 import { assembleOk } from './helpers/asm';
 import { boot as bootSimple, o, runAsm, words } from './helpers';
 
@@ -226,5 +226,38 @@ describe('blue11 assembler ^X (opt-in)', () => {
   it('leaves standard programs alone', () => {
     const { cpu } = runAsm(' MOV #^D10, R0\n HALT', { asm: { hex: true } });
     expect(cpu.r[0]).toBe(10);
+  });
+});
+
+describe('blue11 Rom', () => {
+  it('reads what was loaded, as bytes and words', () => {
+    const rom = new Rom({ base: o('160000'), size: o('10000') });
+    rom.load([0o12, 0o34, 0o56], 2);
+    const m = new DeviceMachine({ memory: o('160000') }).add(rom);
+    expect(m.read(o('160002'), false)).toBe(0o12 | (0o34 << 8));
+    expect(m.read(o('160003'), true)).toBe(0o34);
+    expect(m.read(o('160004'), true)).toBe(0o56);
+    expect(m.read(o('167776'), false)).toBe(0);
+    expect(m.read(o('170000'), false)).toBe(BUS_ERROR);
+  });
+
+  it('a write from the program is a bus error (trap 4)', () => {
+    const rom = new Rom({ base: o('160000'), size: 2 });
+    rom.load([1, 2]);
+    const m = new DeviceMachine({ memory: o('160000') }).add(rom);
+    boot(m, ' MOVB #7, @#160001\n HALT');
+    m.cpu.onTrap = () => 'stop';
+    expect(m.run(100)).toMatchObject({ reason: 'trap', trap: { vector: 4 } });
+    expect(m.read(o('160000'), false)).toBe(1 | (2 << 8));
+  });
+
+  it('throws when a load does not fit, or on a bad base or size', () => {
+    const rom = new Rom({ base: o('160000'), size: 4 });
+    expect(() => rom.load([1, 2, 3, 4, 5])).toThrow(/don't fit/);
+    expect(() => rom.load([1, 2], 3)).toThrow(/don't fit/);
+    expect(() => rom.load([1], -1)).toThrow(/don't fit/);
+    expect(() => new Rom({ base: o('160001'), size: 2 })).toThrow(/even/);
+    expect(() => new Rom({ base: o('160000'), size: 0 })).toThrow(/even/);
+    expect(() => new Rom({ base: o('177000'), size: o('2000') })).toThrow(/177777/);
   });
 });

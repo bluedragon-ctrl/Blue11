@@ -22,9 +22,10 @@ README as a departure from the original machine.
 1. ~~**HackCode uses the package**~~ (done, 2026-11-18, in HackCode): it depends on `blue11`
    ^0.1.0; its copies of the library, tests, examples and docs are deleted, and its 309 tests and
    build pass unchanged.
-2. **The display in the library:** the `Display` device as in the spec, with both beams, and a
-   general `Rom` device (HackCode's, made general). Also their tests (spec §10), a README
-   section, the departure listed, and a minor version.
+2. ~~**The display in the library**~~ (done, 2026-11-18, `blue11` 0.2.0): the `Display` device
+   as in the spec, with both beams, a general `Rom` device, `SimpleMachine({ display })`, their
+   tests (spec §10) and six display examples, a README section, and the departure listed. Left
+   for HackCode: replace its own `Rom` with the library's once it uses 0.2.0.
 3. **The keyboard in the library:** the same steps, from the keyboard spec.
 4. **The simulator** (`apps/simulator`, deployed to GitHub Pages):
    - Editing: CodeMirror with the library's highlighting, and assembler errors shown inline.
