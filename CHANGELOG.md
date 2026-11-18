@@ -5,7 +5,7 @@ minor version may break the API, and a patch never does. The public API is every
 exported from `blue11` and `blue11/codemirror`, plus the JSON form of saved states
 (`cpu.save()`).
 
-## 0.1.0 (unreleased)
+## 0.1.0 (2026-11-18)
 
 The first release. The library was built in HackCode, and moved here with its history:
 
