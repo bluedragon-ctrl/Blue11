@@ -73,8 +73,11 @@ export interface AssembleResult {
   warnings: AsmError[];
 }
 
-/** What a machine needs to run an assembly: its bytes, where they go, where to start. */
-export type Program = Pick<AssembleResult, 'origin' | 'bytes' | 'start'>;
+/**
+ * What a machine needs to run an assembly: its bytes, where they go, where to start; and,
+ * optionally, its lines, so that a machine can say which line a byte it can't load came from.
+ */
+export type Program = Pick<AssembleResult, 'origin' | 'bytes' | 'start'> & Partial<Pick<AssembleResult, 'lines'>>;
 
 const IGNORED = new Set(['.TITLE', '.SBTTL', '.IDENT', '.LIST', '.NLIST', '.PAGE']);
 /** `.ENABL` / `.DSABL` arguments that change only listings or symbol tables: accepted and ignored. */

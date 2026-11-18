@@ -326,10 +326,11 @@ its registers, vector and behaviour are ours (it borrows DEC's CSR bits). So is 
 | Member | |
 | :--- | :--- |
 | `add(device): this` | plug in; throws on overlap with RAM, the PSW or another device, or an odd base/size. Calls `device.attach(cpu)` |
-| `boot(asm)` | clear RAM, `cpu.reset()`, every `device.reset(true)`, copy `asm.bytes` to `asm.origin`, `start(asm)`, counters to 0 |
+| `boot(asm): BootResult` | clear RAM, `cpu.reset()`, every `device.reset(true)`, copy `asm.bytes` to `asm.origin`, `start(asm)`, counters to 0. Only RAM is loaded: `notLoaded` lists the parts outside it (the program's mistake, so a value, not a throw) |
+| `notLoaded(asm): NotLoaded[]` | what `boot` would leave out, without booting: `{ start, end, line? }` (`end` exclusive). With `asm.lines` (an `AssembleResult` has them), one entry per source line with bytes past RAM; without, one range from the end of RAM to the end of the program |
 | `start(asm)` | PC = `asm.start`, SP = `asm.origin` (or `1000` if the origin is below `400`); memory, devices and counters untouched. For a host that loads programs its own way |
 | `run(maxCycles, breakpoints?): RunResult` | like `Cpu.run`, keeping devices in step (see below) |
-| `step(): RunResult` | one instruction, devices advanced by its cycles |
+| `step(maxCycles?): RunResult` | one instruction, devices advanced by its cycles. On a CPU asleep in `WAIT`: time passes to the soonest `wakeIn` (at most `maxCycles`) and the interrupt is taken (reason `'budget'`, 0 instructions, the cycles slept included). Still asleep: `'wait'` with the cycles slept, 0 if no device `canWake` or only host input can wake it and `maxCycles` is Infinity |
 | `read(addr, byte)` / `write(addr, value, byte)` | the bus, for the host too. Reading a device register has its side effects (e.g. RBUF clears DONE) |
 | `reset()` | the `RESET` instruction: every `device.reset(false)` |
 | `cpu`, `ram` (`Uint8Array`), `cycles`, `instructions` | totals since `boot` (writable) |

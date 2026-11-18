@@ -72,6 +72,29 @@ ISR:    INC R1
     expect(t.resets).toEqual([true, false]);
   });
 
+  it('boot reports the parts of a program outside RAM, by source line, and loads the rest', () => {
+    const m = new DeviceMachine({ memory: o('1010') });
+    const asm = assembleOk(' MOV #1, R0\n HALT\n .=1006\n .WORD 6, 7, 10\n .=170000\n .WORD 11\n .BLKW 2');
+    const r = m.boot(asm);
+    expect(r.notLoaded).toEqual([
+      { start: o('1010'), end: o('1014'), line: 4 },
+      { start: o('170000'), end: o('170002'), line: 6 },
+      { start: o('170002'), end: o('170006'), line: 7 },
+    ]);
+    expect(m.notLoaded(asm)).toEqual(r.notLoaded);
+    expect(m.read(o('1006'), false)).toBe(6); // the part inside RAM is loaded
+    expect(m.cpu.r[7]).toBe(o('1000'));
+    expect(m.boot(assembleOk(' HALT')).notLoaded).toEqual([]);
+  });
+
+  it('without lines, boot reports one range from the end of RAM to the end of the program', () => {
+    const m = new DeviceMachine({ memory: o('1010') });
+    const { origin, bytes, start } = assembleOk(' HALT\n .=1020\n .WORD 1');
+    expect(m.boot({ origin, bytes, start }).notLoaded).toEqual([{ start: o('1010'), end: o('1022') }]);
+    const high = assembleOk(' .=170000\n .WORD 1');
+    expect(m.notLoaded({ origin: high.origin, bytes: high.bytes, start: high.start })).toEqual([{ start: o('170000'), end: o('170002') }]);
+  });
+
   it('WAIT with no device able to wake it stops at once', () => {
     const m = new DeviceMachine().add(new Timer(o('170000'), 500));
     boot(m, ' WAIT\n HALT');
@@ -114,6 +137,50 @@ ISR:    INC R1
     expect(m.read(0o1000, true)).toBe(0o377);
     expect(Number.isNaN(m.read(0o1000, false))).toBe(false);
     expect(m.read(0o777, false)).toBe(m.read(0o776, false));
+  });
+
+  it('a step on a sleeping CPU sleeps to the clock tick and takes its interrupt', () => {
+    const { m } = bootSimple(' MOV #2000, SP\n MOV #ISR, @#100\n MOV #100, @#177546\n WAIT\n HALT\nISR: RTI', { clockCycles: 1000 });
+    for (let i = 0; i < 3; i++) m.step();
+    const wait = m.step(); // WAIT itself
+    expect(wait).toMatchObject({ reason: 'wait', instructions: 1 });
+    const before = m.cycles;
+    const r = m.step(); // asleep: to the tick, then the interrupt
+    expect(r.reason).toBe('budget');
+    expect(r.instructions).toBe(0);
+    expect(m.cpu.waiting).toBe(false);
+    expect(m.cpu.r[7]).toBe(m.read(0o100, false));
+    expect(m.cycles - before).toBe(r.cycles);
+    expect(m.cycles).toBeGreaterThanOrEqual(1000);
+    expect(m.step().instructions).toBe(1); // RTI, back after the WAIT
+    expect(m.step()).toMatchObject({ reason: 'halt' });
+  });
+
+  it('a step on a sleeping CPU sleeps at most maxCycles', () => {
+    const { m } = bootSimple(' MOV #2000, SP\n MOV #ISR, @#100\n MOV #100, @#177546\n WAIT\n HALT\nISR: RTI', { clockCycles: 1000 });
+    for (let i = 0; i < 4; i++) m.step();
+    const start = m.cycles;
+    expect(m.step(100)).toEqual({ reason: 'wait', cycles: 100, instructions: 0 });
+    expect(m.cycles).toBe(start + 100);
+    expect(m.cpu.waiting).toBe(true);
+    expect(m.step().reason).toBe('budget');
+    expect(m.cpu.waiting).toBe(false);
+  });
+
+  it('a step on a CPU only host input can wake returns wait with no time passed', () => {
+    const { m } = bootSimple(' MOV #2000, SP\n MOV #100, @#177560\n WAIT\n HALT');
+    for (let i = 0; i < 3; i++) m.step();
+    const start = m.cycles;
+    expect(m.step()).toEqual({ reason: 'wait', cycles: 0, instructions: 0 });
+    expect(m.step(500)).toEqual({ reason: 'wait', cycles: 500, instructions: 0 });
+    expect(m.cycles).toBe(start + 500);
+  });
+
+  it('a step on a CPU nobody can wake returns wait at once', () => {
+    const m = new DeviceMachine().add(new Timer(o('170000'), 500));
+    boot(m, ' WAIT\n HALT');
+    m.step();
+    expect(m.step(1000)).toEqual({ reason: 'wait', cycles: 0, instructions: 0 });
   });
 
   it('WAIT with only keyboard interrupts sleeps out the budget in one go', () => {

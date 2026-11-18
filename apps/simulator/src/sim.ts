@@ -8,7 +8,7 @@
  */
 
 import {
-  assemble, DSP, SimpleMachine, type AsmError, type Frame, type AssembleResult, type Beam, type Key, type StopReason, type TrapInfo,
+  assemble, DSP, octal, SimpleMachine, type AsmError, type AssembleResult, type Beam, type Frame, type Key, type StopReason, type TrapInfo,
 } from 'blue11';
 import { makeRom, programSymbols } from './rom';
 
@@ -164,8 +164,14 @@ export class Simulator {
   load(source: string): AsmError[] {
     const asm = assemble(source, { symbols: programSymbols() });
     if (!asm.ok) return asm.errors;
-    if (asm.origin + asm.bytes.length > RAM_END) {
-      return [{ line: 0, column: 0, message: `the program runs past the end of RAM (${RAM_END.toString(8)}), into the display's memory` }];
+    // Everything past RAM would be left out: say so on each line, and load nothing.
+    const outside = this.machine.notLoaded(asm);
+    if (outside.length) {
+      return outside.map((n) => ({
+        line: n.line ?? 0,
+        column: 0,
+        message: `${octal(n.start)}–${octal(n.end - 1)} is past the end of RAM (${octal(RAM_END - 1)}), in the display's memory or above: it can't be loaded`,
+      }));
     }
     this.program = asm;
     this.source = source;
@@ -265,22 +271,21 @@ export class Simulator {
     const cpu = this.cpu;
     if (cpu.halted) return this.finish('halt', 0);
     let used = 0;
-    if (cpu.waiting) {
-      while (cpu.waiting && used < this.frameCycles) {
-        const r = this.machine.run(1);
-        used += r.cycles;
-        this.feed();
-        if (r.reason === 'wait' && r.cycles === 0) return this.finish('asleep', used);
+    while (true) {
+      // Asleep, the machine sleeps to the next device event; stop it at the next replayed input.
+      const next = this.pending[0]?.cycle;
+      const limit = Math.min(this.frameCycles - used, next !== undefined ? Math.max(1, next - this.machine.cycles) : Infinity);
+      const r = this.machine.step(limit);
+      used += r.cycles;
+      this.feed();
+      if (r.reason === 'trap' || r.reason === 'double-fault' || r.reason === 'halt') {
+        this.trap = r.trap ?? null;
+        return this.finish(r.reason, used);
       }
-      return this.finish(cpu.waiting ? 'frame' : 'step', used);
+      if (r.reason !== 'wait' || r.instructions > 0) return this.finish('step', used);
+      if (r.cycles === 0) return this.finish('asleep', used);
+      if (used >= this.frameCycles) return this.finish('frame', used);
     }
-    const r = this.machine.step();
-    this.feed();
-    if (r.reason === 'trap' || r.reason === 'double-fault' || r.reason === 'halt') {
-      this.trap = r.trap ?? null;
-      return this.finish(r.reason, r.cycles);
-    }
-    return this.finish('step', r.cycles);
   }
 
   private finish(stop: Stop | 'step', cycles: number): StepResult {

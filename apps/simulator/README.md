@@ -12,7 +12,8 @@ deployed to GitHub Pages from `main`: **[bluedragon-ctrl.github.io/Blue11](https
 - **Run, Continue, Pause, Step, Step frame, Restart.** The machine runs whole frames of 20000
   cycles. **Speed** is in frames per second of wall time (1–600; 60 is real time), never in
   cycles per frame, so a program behaves the same at every speed. **Real beam (tearing)** and
-  **EIS** are settings of the machine: changing one starts the program again.
+  **EIS** are settings of the machine: changing one starts the program again. Step on a `WAIT`
+  sleeps to the next interrupt and stops in its handler (at most a frame).
 - **Screen** (the display, mode 0 or 1), **Listing** (the assembler's listing, the PC's row
   lit) and **ROM** (its listing) tabs.
 - **The screen after the end.** While a program runs, the screen shows the frames the display
