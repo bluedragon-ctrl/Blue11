@@ -15,7 +15,8 @@ deployed to GitHub Pages from `main`: **[bluedragon-ctrl.github.io/Blue11](https
   **EIS** are settings of the machine: changing one starts the program again.
 - **Screen** (the display, mode 0 or 1), **Listing** (the assembler's listing, the PC's row
   lit) and **ROM** (its listing) tabs.
-- **CPU** (registers, flags, priority), **Console** (the DL11 terminal), **Disassembly**
+- **Console** (the DL11 terminal), below the tabs, so it stays in view with each of them.
+- **CPU** (registers, flags, priority), **Disassembly**
   (click a row for a breakpoint, also in the ROM), **Memory** (an octal address, a label, a
   device name such as `DSPCS`, or a register), **Stack**, and the **Input log**.
 - **Keys.** While the screen or the console has focus ("keyboard → program"), every key goes

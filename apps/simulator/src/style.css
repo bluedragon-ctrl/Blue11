@@ -40,6 +40,7 @@ main > .code { display: flex; flex-direction: column; height: calc(100vh - 5.5re
 #editor { flex: 1; min-height: 0; }
 #editor .cm-editor { height: 100%; border: 1px solid var(--line); }
 .board { display: flex; flex-direction: column; gap: 0.6rem; }
+.board .console h2 { margin-top: 0; }
 
 /* screen / listing / ROM tabs */
 .view-tabs { display: flex; gap: 0.25rem; border-bottom: 1px solid var(--line); }
@@ -56,7 +57,7 @@ main > .code { display: flex; flex-direction: column; height: calc(100vh - 5.5re
 .focus-label[hidden] { display: none; }
 .screen-info { opacity: 0.75; white-space: pre; text-align: center; }
 .mv-box { background: #000; border: 1px solid var(--line); padding: 0.35rem 0.5rem; white-space: pre; overflow-x: auto; }
-.mv-listing { max-height: calc(100vh - 12rem); overflow: auto; padding: 0.25rem 0; }
+.mv-listing { max-height: calc(100vh - 26rem); min-height: 12rem; overflow: auto; padding: 0.25rem 0; }
 .mv-listing .lrow { padding: 0 0.5rem; white-space: pre; }
 .mv-listing .lrow.pc { background: #39d0ff30; color: #fff; box-shadow: inset 3px 0 0 var(--accent); }
 .mv-listing .empty { white-space: normal; opacity: 0.6; font-family: system-ui, sans-serif; padding: 0 0.5rem; }
@@ -67,7 +68,7 @@ main > .code { display: flex; flex-direction: column; height: calc(100vh - 5.5re
 .side h2:first-child { margin-top: 0; }
 pre { margin: 0; padding: 0.5rem; background: #000; border: 1px solid var(--line); min-height: 3rem; white-space: pre-wrap; }
 .side pre, .listing { font-size: 0.8rem; }
-#output { min-height: 3rem; max-height: 10rem; overflow: auto; outline: none; word-break: break-all; }
+#output { min-height: 6rem; max-height: 12rem; font-size: 0.8rem; overflow: auto; outline: none; word-break: break-all; }
 #output:focus { border-color: var(--accent); }
 #inputs { max-height: 8rem; overflow: auto; }
 #memory { white-space: pre; }

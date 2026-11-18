@@ -56,15 +56,15 @@
           <div class="mv-note">Read-only memory at 160000–167777. Call <code>JSR PC, @#DRAWCH</code> (mode 0) or <code>JSR PC, @#DRAWC1</code> (mode 1) with R0 = the character, R1 = where it goes, R2 = the colour.</div>
           <div id="rom-listing" class="mv-box mv-listing"></div>
         </div>
+        <div class="console">
+          <h2>Console <span class="hint">click, then type</span></h2>
+          <pre id="output" tabindex="0" title="The DL11 terminal: what the program prints. Click here: the keys you press go to the program (the console, and the keyboard device)"></pre>
+        </div>
       </section>
       <section class="pane side">
         <div>
           <h2>CPU</h2>
           <pre id="regs"></pre>
-        </div>
-        <div>
-          <h2>Console <span class="hint">click, then type</span></h2>
-          <pre id="output" tabindex="0" title="The DL11 terminal: what the program prints. Click here: the keys you press go to the program (the console, and the keyboard device)"></pre>
         </div>
         <div>
           <h2>Disassembly <span class="hint">click: breakpoint</span></h2>
