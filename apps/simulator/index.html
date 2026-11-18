@@ -6,7 +6,7 @@
     <title>Blue-11 simulator</title>
     <link rel="stylesheet" href="./src/style.css" />
   </head>
-  <body>
+  <body class="retro">
     <header>
       <h1>Blue-11</h1>
       <span class="tag">A PDP-11-style computer to program in assembly: screen, keyboard, console</span>
@@ -33,6 +33,7 @@
           </label>
           <label title="The real beam draws the picture row by row while the program runs, so changing the page or palette mid-frame tears. Changing it restarts the program."><input id="beam" type="checkbox"> Real beam (tearing)</label>
           <label title="The Extended Instruction Set: MUL, DIV, ASH, ASHC. Changing it restarts the program."><input id="eis" type="checkbox"> EIS</label>
+          <label title="The look of the period: the screen as a CRT, the listings printed on fan-fold paper, the console as an amber terminal. The editor and the debugger stay as they are."><input id="retro" type="checkbox"> Retro</label>
         </div>
         <div id="status"></div>
         <div id="editor"></div>
@@ -46,7 +47,10 @@
         <div id="view-screen" class="view">
           <div id="keys-hint" class="keys-hint"></div>
           <div id="focus-label" class="focus-label" hidden>keyboard → program</div>
-          <canvas id="screen" tabindex="0" width="64" height="64" title="Click here: the keys you press go to the program (the keyboard device, and the console for characters)"></canvas>
+          <div id="crt" class="crt">
+            <canvas id="screen" tabindex="0" width="64" height="64" title="Click here: the keys you press go to the program (the keyboard device, and the console for characters)"></canvas>
+            <div id="beam-row" class="beam-row" hidden title="The beam: the row it reads next (DSPLIN)"></div>
+          </div>
           <div id="screen-info" class="screen-info"></div>
         </div>
         <div id="view-listing" class="view" hidden>
@@ -56,15 +60,15 @@
           <div class="mv-note">Read-only memory at 160000–167777. Call <code>JSR PC, @#DRAWCH</code> (mode 0) or <code>JSR PC, @#DRAWC1</code> (mode 1) with R0 = the character, R1 = where it goes, R2 = the colour.</div>
           <div id="rom-listing" class="mv-box mv-listing"></div>
         </div>
+        <div class="console">
+          <h2>Console <span class="hint">click, then type</span></h2>
+          <pre id="output" tabindex="0" title="The DL11 terminal: what the program prints. Click here: the keys you press go to the program (the console, and the keyboard device)"></pre>
+        </div>
       </section>
       <section class="pane side">
         <div>
           <h2>CPU</h2>
           <pre id="regs"></pre>
-        </div>
-        <div>
-          <h2>Console <span class="hint">click, then type</span></h2>
-          <pre id="output" tabindex="0" title="The DL11 terminal: what the program prints. Click here: the keys you press go to the program (the console, and the keyboard device)"></pre>
         </div>
         <div>
           <h2>Disassembly <span class="hint">click: breakpoint</span></h2>

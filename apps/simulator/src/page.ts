@@ -55,6 +55,9 @@ export function startPage(): void {
   const speed = $<HTMLInputElement>('speed');
   const beam = $<HTMLInputElement>('beam');
   const eis = $<HTMLInputElement>('eis');
+  const retro = $<HTMLInputElement>('retro');
+  const crt = $('crt');
+  const beamRow = $('beam-row');
   const buttons = {
     run: $<HTMLButtonElement>('run'),
     continue: $<HTMLButtonElement>('continue'),
@@ -222,6 +225,9 @@ export function startPage(): void {
       afterRebuild();
     }
   }
+  const setRetro = (on: boolean) => { retro.checked = on; document.body.classList.toggle('retro', on); };
+  setRetro(library.retro);
+  retro.addEventListener('change', () => { library.retro = retro.checked; setRetro(retro.checked); });
   beam.addEventListener('change', () => { pause(); setBeam(beam.checked); if (sim.program) showStatus('The beam changed: the program starts again from the beginning.'); });
   eis.addEventListener('change', () => {
     pause();
@@ -492,7 +498,7 @@ export function startPage(): void {
     const f = sim.display.frame;
     if (f === shownFrame) return;
     shownFrame = f;
-    if (canvas.width !== f.width) { canvas.width = f.width; canvas.height = f.height; }
+    if (canvas.width !== f.width) { canvas.width = f.width; canvas.height = f.height; crt.style.setProperty('--rows', String(f.height)); }
     const img = ctx.createImageData(f.width, f.height);
     frameToRgba(f, img.data);
     ctx.putImageData(img, 0, 0);
@@ -562,7 +568,16 @@ export function startPage(): void {
     drawScreen();
     const d = sim.display;
     const f = d.frame;
-    $('screen-info').textContent = `mode ${f.width === 128 ? 1 : 0} (${f.width} × ${f.height})   frame ${octal(f.number)}   cycle ${sim.machine.cycles}   ${sim.beam === 'scan' ? 'real beam' : 'instant beam'}`;
+    // Stopped mid-frame, a marker shows the row the beam reads next (DSPLIN).
+    const row = d.line;
+    const midFrame = !running && !!sim.program && row !== 0o177777;
+    beamRow.hidden = !midFrame;
+    if (midFrame) beamRow.style.top = `calc(var(--tube) + (100% - 2 * var(--tube)) * ${(row + 0.5) / d.height})`;
+    // Items are kept whole when the line wraps.
+    $('screen-info').textContent = [
+      `mode ${f.width === 128 ? 1 : 0} (${f.width} × ${f.height})`, `frame ${octal(f.number)}`, `cycle ${sim.machine.cycles}`,
+      sim.beam === 'scan' ? 'real beam' : 'instant beam', `beam ${row === 0o177777 ? 'in blank' : `row ${octal(row, 3)}`}`,
+    ].map((t) => t.replace(/ /g, '\u00a0')).join('   ');
     if (view !== 'screen') showListing(view);
     showInputs();
   }

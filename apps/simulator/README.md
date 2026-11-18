@@ -15,7 +15,15 @@ deployed to GitHub Pages from `main`: **[bluedragon-ctrl.github.io/Blue11](https
   **EIS** are settings of the machine: changing one starts the program again.
 - **Screen** (the display, mode 0 or 1), **Listing** (the assembler's listing, the PC's row
   lit) and **ROM** (its listing) tabs.
-- **CPU** (registers, flags, priority), **Console** (the DL11 terminal), **Disassembly**
+- **Console** (the DL11 terminal), below the tabs, so it stays in view with each of them.
+- **Retro** (on unless turned off, kept in the browser): the machine's own views in the look of
+  the period. The screen is a CRT in its bezel, with one faint scanline per row the display
+  draws; the Listing and ROM are printed on green-bar fan-fold paper; the console is an amber
+  terminal. Nothing moves or blurs a pixel or a character, and the editor and the debugger
+  stay as they are.
+- **The beam.** Stopped in the middle of a frame, a marker beside the screen shows the row the
+  beam reads next (`DSPLIN`), and the line under the screen says it.
+- **CPU** (registers, flags, priority), **Disassembly**
   (click a row for a breakpoint, also in the ROM), **Memory** (an octal address, a label, a
   device name such as `DSPCS`, or a register), **Stack**, and the **Input log**.
 - **Keys.** While the screen or the console has focus ("keyboard → program"), every key goes

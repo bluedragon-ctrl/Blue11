@@ -14,6 +14,7 @@ export interface KeyValue {
 
 const CURRENT = 'blue11.sim.current';
 const SAVED = 'blue11.sim.programs';
+const RETRO = 'blue11.sim.retro';
 
 export class Library {
   constructor(private readonly store: KeyValue | null) {}
@@ -29,6 +30,10 @@ export class Library {
       return v && typeof v === 'object' && !Array.isArray(v) ? v : {};
     } catch { return {}; }
   }
+
+  /** The period look (CRT screen, printed listings, amber console): on unless turned off. */
+  get retro(): boolean { return this.read(RETRO) !== 'off'; }
+  set retro(on: boolean) { this.write(RETRO, on ? 'on' : 'off'); }
 
   save(name: string, source: string): void { this.write(SAVED, JSON.stringify({ ...this.saved, [name]: source })); }
 
