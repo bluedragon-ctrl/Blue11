@@ -1,16 +1,17 @@
 /**
- * The programs in the Examples menu: the library's examples (console, display, keyboard)
- * and the ROM's showcase (docs/BLUE11_DISPLAY.md §11), which use DRAWCH and DRAWC1.
+ * The programs in the Examples menu: the first steps for beginners (first-steps.ts), the
+ * library's examples (console, display, keyboard) and the ROM's showcase (docs/BLUE11_DISPLAY.md §11), which use DRAWCH and DRAWC1.
  */
 
 import type { AsmError, Beam } from 'blue11';
 import type { Simulator } from './sim';
+import { FIRST_STEPS } from './first-steps';
 import { DISPLAY_EXAMPLES, EXAMPLES, KEYBOARD_EXAMPLES, VSYNC } from '../../../packages/blue11/examples/examples';
 
 export interface Program {
   /** Unique, for the menu and the URL. */
   id: string;
-  group: 'Console' | 'Display' | 'Keyboard' | 'Text (the ROM)';
+  group: 'First steps' | 'Console' | 'Display' | 'Keyboard' | 'Text (the ROM)';
   name: string;
   source: string;
   /** The beam it is meant for. */
@@ -154,14 +155,15 @@ const slug = (s: string) => s.toLowerCase().replace(/\(.*?\)/g, '').trim().repla
 
 /** Every example, in menu order. */
 export const PROGRAMS: Program[] = [
+  ...FIRST_STEPS.map((e) => ({ ...e, id: `first-${slug(e.name)}`, group: 'First steps' as const })),
   ...EXAMPLES.map((e) => ({ id: `console-${slug(e.name)}`, group: 'Console' as const, name: e.name, source: e.source, input: e.input, expect: e.expect })),
   ...DISPLAY_EXAMPLES.map((e) => ({ id: `display-${slug(e.name)}`, group: 'Display' as const, name: e.name, source: e.source, beam: e.beam })),
   ...KEYBOARD_EXAMPLES.map((e) => ({ id: `keyboard-${slug(e.name)}`, group: 'Keyboard' as const, name: e.name, source: e.source, keys: e.keys })),
   ...ROM_EXAMPLES.map((e) => ({ ...e, id: `text-${slug(e.name)}`, group: 'Text (the ROM)' as const })),
 ];
 
-/** The first program on a fresh page. */
-export const FIRST = PROGRAMS.find((p) => p.id.startsWith('text-hello'))!;
+/** The first program on a fresh page: the first of the first steps. */
+export const FIRST = PROGRAMS[0];
 
 /**
  * Start an example as the page does (its beam, then load it), and type its console input

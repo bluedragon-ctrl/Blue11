@@ -8,7 +8,8 @@ import { describe, expect, it } from 'vitest';
 import { SIM_SYMBOLS } from '../../../packages/blue11/examples/examples';
 import { uncommentedLines } from '../../../packages/blue11/test/helpers/comments';
 import { glyphBytes } from '../src/font';
-import { PROGRAMS, ROM_EXAMPLES, startProgram, type Program } from '../src/programs';
+import { FIRST_STEPS } from '../src/first-steps';
+import { FIRST, PROGRAMS, ROM_EXAMPLES, startProgram, type Program } from '../src/programs';
 import { Simulator } from '../src/sim';
 
 /** Keys pressed (true) or released (false) before the frame with that index runs. */
@@ -33,11 +34,15 @@ const byName = (name: string) => PROGRAMS.find((p) => p.name.startsWith(name))!;
 
 describe('the examples menu', () => {
   it('holds every example of the library and the ROM showcase, with unique ids', () => {
-    expect(PROGRAMS.length).toBe(7 + 6 + 4 + 3);
+    expect(PROGRAMS.length).toBe(8 + 7 + 6 + 4 + 3);
     expect(new Set(PROGRAMS.map((p) => p.id)).size).toBe(PROGRAMS.length);
   });
 
-  it.each(ROM_EXAMPLES.map((e) => [e.name, e] as const))('%s has a comment on every line', (_n, e) => {
+  it('opens the first step on a fresh page', () => {
+    expect(FIRST.name).toBe('1. A pixel');
+  });
+
+  it.each([...FIRST_STEPS, ...ROM_EXAMPLES].map((e) => [e.name, e] as const))('%s has a comment on every line', (_n, e) => {
     expect(uncommentedLines(e.source)).toEqual([]);
   });
 });
@@ -151,5 +156,60 @@ describe('text examples (the ROM)', () => {
     expectText(f, 'Rainbow', 0, 1, (y) => 0o10 + y);
     expectText(f, 'letters', 0, 3, (y) => 0o10 + y);
     expectText(f, 'ROM font', 0, 5, () => 0o17);
+  });
+});
+
+describe('first steps do what their comments say', () => {
+  const step = (n: number) => PROGRAMS.find((p) => p.group === 'First steps' && p.name.startsWith(`${n}.`))!;
+  /** The pixel at (x, y) of mode 0, from memory as it is (the steps halt within a frame). */
+  const px = (sim: Simulator, x: number, y: number) => sim.screenNow().pixels[y * 64 + x];
+  const word = (sim: Simulator, label: string) => sim.machine.read(sim.program!.symbols.get(label)!, false);
+
+  it('1. a yellow and a red pixel', () => {
+    const { sim, stop } = play(step(1));
+    expect(stop).toBe('halt');
+    expect([px(sim, 0o40, 0o40), px(sim, 0o50, 0o40)]).toEqual([0o16, 4]);
+    expect(sim.screenNow().pixels.filter((v) => v).length).toBe(2);
+  });
+
+  it('2. sums in registers', () => {
+    const { sim } = play(step(2));
+    expect([sim.cpu.r[0], sim.cpu.r[1]]).toEqual([6, 4]);
+  });
+
+  it('3. variables in memory', () => {
+    const { sim } = play(step(3));
+    expect([sim.cpu.r[0], word(sim, 'SCORE'), word(sim, 'BONUS'), word(sim, 'LIVES')]).toEqual([0o150, 0o150, 0o50, 4]);
+  });
+
+  it('4. a line of 40 pixels in row 20', () => {
+    const { sim } = play(step(4));
+    const row = [...Array(64).keys()].map((x) => px(sim, x, 0o20));
+    expect(row).toEqual([...Array(64).keys()].map((x) => (x < 0o40 ? 0o12 : 0)));
+  });
+
+  it('5. row 40: red left of the middle, blue from it', () => {
+    const { sim } = play(step(5));
+    expect([...Array(64).keys()].map((x) => px(sim, x, 0o40))).toEqual([...Array(64).keys()].map((x) => (x < 0o40 ? 4 : 1)));
+  });
+
+  it('6. prints its text', () => {
+    const { stop, output } = play(step(6));
+    expect(stop).toBe('halt');
+    expect(output).toBe('Hi there!');
+  });
+
+  it('7. three lines from one subroutine', () => {
+    const { sim } = play(step(7));
+    for (const [y, c] of [[0o10, 4], [0o20, 0o16], [0o30, 2]]) {
+      expect([...Array(64).keys()].map((x) => px(sim, x, y))).toEqual([...Array(64).keys()].map((x) => (x >= 0o10 && x < 0o70 ? c : 0)));
+    }
+  });
+
+  it('8. the dot moves while → is held, and Q quits', () => {
+    const { stop, frames } = play(step(8), [[2, 'ArrowRight', true], [5, 'ArrowRight', false], [8, 'KeyQ', true]]);
+    expect(stop).toBe('halt');
+    const dot = (f: Frame) => [...f.pixels.keys()].filter((i) => f.pixels[i]).map((i) => i % 64);
+    expect(frames.slice(0, 8).map(dot)).toEqual([[32], [32], [33], [34], [35], [35], [35], [35]]);
   });
 });

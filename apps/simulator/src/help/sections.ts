@@ -18,6 +18,7 @@ import { symbolEntries } from './symbols';
 const o = (n: number, digits = 6) => octal(n, digits);
 const START = 'Start';
 const LANGUAGE = 'Language';
+const MEMREG = 'Memory and registers';
 const INSTRUCTIONS = 'Instructions';
 const MACHINE = 'The machine';
 const DEVICES = 'Devices';
@@ -68,22 +69,22 @@ const start: Section = {
     list(
       'An optional `label:` names the line, so other lines can jump to it or read it.',
       'Then the instruction and its **operands**, separated by a comma. The **source comes first**: `MOV #3, R0` moves 3 into R0.',
-      '`R0` is a [register](registers), a fast storage place inside the CPU.',
+      '`R0` is a [register](registers), a fast storage place inside the CPU. [The big picture](computer) explains registers and memory.',
       'Names such as `SCREEN`, `DSPCS` and `KBDKEY` are [predefined](symbols): every program can use them.',
     ),
     h('Where to go next'),
     list(
-      'The **Programs** menu has examples for the console, the display and the keyboard. Open one, run it, change it.',
-      'Read [Writing assembly](assembler), then [Registers and flags](registers) and [Addressing modes](addressing). Then pick [instructions](instructions) as you need them.',
+      'The **Programs** menu starts with **First steps**: eight short programs, each adding one idea, from a single pixel to a dot you move with the keys. Open one, Step through it, change it. After them come bigger programs for the console, the display and the keyboard.',
+      'Read [The big picture](computer) to see how the CPU, registers and memory work together, then [Writing assembly](assembler) and [Addressing modes](addressing). Pick [instructions](instructions) as you need them.',
       'Make something: pixels on the [display](display), keys from the [keyboard](keyboard), text with the [ROM](rom).',
       'Stuck? [When something goes wrong](problems) lists the usual mistakes.',
     ),
-    note('Press **F1** in the editor to look up the word under the cursor: an instruction, a register, a device name. Resting the mouse on one shows a short help. The search box above finds anything in the help.'),
+    note('Press **F1** in the editor to look up the word under the cursor: an instruction, a register, a device name. Resting the mouse on one shows a short help. The search box above finds anything in the help, and the [glossary](glossary) explains the words it uses.'),
   ],
 };
 
 const octalSection: Section = {
-  id: 'octal', title: 'Octal numbers', group: START,
+  id: 'octal', title: 'Numbers: octal and negative', group: START,
   blocks: [
     p('Blue-11 counts in **octal**, base 8, as the PDP-11 did. Octal uses only the digits 0–7: after 7 comes 10 (eight), after 77 comes 100 (sixty-four). '
       + 'Every number in the editor, the panels and this help is octal, unless it ends in a dot: `10.` is ten.'),
@@ -104,12 +105,25 @@ const octalSection: Section = {
       ['Value', '`1`', '`2`', '`4`', '`10`', '`20`', '`40`', '`100`', '`200`', '`100000`'],
     ]),
     p('So `BIS #100, @#LKS` sets bit 6 (the [line clock](clock)\'s IE), and `TSTB` tests bit 7 (`200`), the sign of a byte.'),
+    h('Negative numbers'),
+    p('A word has 16 bits, so it holds 0 to 177777. To have negative numbers too, the top bit (bit 15) is taken to mean *negative*. This is called **two\'s complement**: '
+      + 'to make a number negative, invert every bit and add 1. 1 is 000001; inverted, 177776; plus 1, 177777. So 177777 is −1.'),
+    table(['Bits as written', 'Unsigned', 'Signed'], [
+      ['`000000`', '0', '0'],
+      ['`077777`', '32767.', '32767. (the largest)'],
+      ['`100000`', '32768.', '−32768. (the smallest)'],
+      ['`177776`', '65534.', '−2'],
+      ['`177777`', '65535.', '−1'],
+    ]),
+    p('The same bits are both numbers: you decide which one you mean, by the [branch](ins-branch) you use. Adding and subtracting work the same either way. '
+      + 'A byte works the same in 8 bits: 377 is −1, 200 is −128., 177 is 127.'),
+    p('**Sign extension**: `MOVB` into a register copies the byte\'s top bit into the whole high byte, so the number keeps its sign. 377 (−1) becomes 177777 (−1), while 177 becomes 000177.'),
     h('Writing numbers'),
     list(
       '`17` is octal (fifteen); `15.` is decimal (fifteen).',
       '`^D15` is decimal, `^O17` octal and `^B1111` binary: all three are fifteen.',
       '`\'A` is the character code of A (`101`).',
-      '`-1` is `177777`: negative numbers are stored in *two\'s complement*, where the top bit set means negative.',
+      '`-1` is `177777`, `-2` is `177776`: see above.',
     ),
     note('Most calculators have an octal mode (often called *oct* or *programmer*). The **Memory** panel and the registers show octal, so you get used to it quickly.'),
   ],
@@ -125,6 +139,7 @@ const running: Section = {
       ['**Restart**', 'Load the program again, stopped at its first instruction.'],
     ]),
     p('To go one step at a time, see [Debugging](debugging).'),
+    p('While the program runs, the screen shows a new picture every frame. When it has ended (a `HALT`, or an error), the screen shows the pixel memory as it is, as a real monitor goes on showing it while the CPU stands still.'),
     h('Time and speed'),
     p(`The machine runs in **frames** of ${dec(FRAME)} cycles; the [display](display) shows one picture per frame, 60 a second. `
       + 'A **cycle** is one trip to memory, so a short instruction costs 1–3 [cycles](cycles). '
@@ -278,25 +293,76 @@ const directives: Section = {
   ],
 };
 
+const bigPicture: Section = {
+  id: 'computer', title: 'The big picture: CPU, registers, memory', group: MEMREG,
+  blocks: [
+    p('Every program does the same few things: it takes numbers from somewhere, works on them, and puts the results somewhere. That *somewhere* is either **memory** or a **register**. This page shows how they fit together.'),
+    table(['Part', 'What it is', 'Where you see it'], [
+      ['**CPU**', 'The processor: it runs instructions, one after the other.', 'the highlighted line'],
+      ['**Registers**', 'Eight 16-bit places **inside** the CPU, called R0–R7. Few, but fast: the CPU works on them directly.', 'the **CPU** panel'],
+      ['**Memory**', '65536. bytes **outside** the CPU, each with a number, its **address** (0–177777). Big, but each use costs time.', 'the **Memory** panel'],
+    ]),
+    h('Memory: numbered boxes'),
+    p('Think of memory as a long row of boxes, numbered from 0. Each box holds one **byte** (0–377). Two boxes side by side, starting at an even number, make a **word** (0–177777), the size the CPU works in. '
+      + 'Everything lives in memory: your program, its variables, the stack, even the pixels of the screen and the devices\' registers. A label like `COUNT:` is just a name for one box\'s address.'),
+    h('Registers: the CPU\'s hands'),
+    p('Memory is big, but every trip to it costs a [cycle](cycles). So programs bring the values they are working on into **registers**, which the CPU uses directly, like holding something in your hands instead of fetching it from a shelf each time. '
+      + 'R0–R5 are free for anything. Two have a fixed job: **R6 = SP**, the stack pointer, holds the address of the top of the [stack](stack); **R7 = PC**, the program counter, holds the address of the next instruction.'),
+    h('How an instruction runs'),
+    p('Your program is numbers in memory too (the **Listing** tab shows them). The CPU repeats three steps forever: **fetch** the instruction at the address in PC, move PC past it, **do** it. '
+      + 'A jump or branch just puts a new address into PC. `HALT` stops the repeating.'),
+    h('Follow a program'),
+    p('This program takes two numbers from memory, adds them in a register, and puts the sum back in memory. Press **Step** (F10) and watch PC, R0 and the word at `C` change:'),
+    code(`
+              MOV  A, R0          ; memory → register:  R0 = 5
+              ADD  B, R0          ; memory + register:  R0 = 5 + 3
+              MOV  R0, C          ; register → memory:  C = 10 (eight)
+              HALT
+      A:      .WORD 5
+      B:      .WORD 3
+      C:      .WORD 0
+    `, { run: true }),
+    table(['After', 'PC', 'R0', 'Word at C'], [
+      ['loading', '`001000`', '`0`', '`0`'],
+      ['`MOV A, R0`', '`001004`', '`5`', '`0`'],
+      ['`ADD B, R0`', '`001010`', '`10`', '`0`'],
+      ['`MOV R0, C`', '`001014`', '`10`', '`10`'],
+      ['`HALT`', '`001016`', '`10`', '`10`'],
+    ]),
+    p('Each of the first three instructions takes two words: the instruction, and a second word that says where `A`, `B` or `C` is. So PC moves on by 4 each time. `HALT` is one word.'),
+    note('**A register holds one number; memory holds many.** Load what you need into registers, work there, store the results back. Most programs are this pattern again and again.'),
+    h('Read on'),
+    list(
+      '[Registers and flags](registers): each register, and the flags that remember facts about the last result.',
+      '[Memory](memory): what is at which address, variables and tables.',
+      '[Addressing modes](addressing): all the ways an operand can say where a number is.',
+      '[The stack](stack): a pile of words for saving registers and calling subroutines.',
+    ),
+  ],
+};
+
 const registers: Section = {
-  id: 'registers', title: 'Registers and flags', group: LANGUAGE,
+  id: 'registers', title: 'Registers and flags', group: MEMREG,
   blocks: [
     p('**Registers** are eight 16-bit storage places inside the CPU. They are where the work happens: using a register is free, while every trip to memory costs a [cycle](cycles). '
       + 'Six are yours to use as you like; two have a special job. The **CPU** panel shows them all.'),
     entries(
       e('reg-R0', ['R0', 'R1', 'R2', 'R3', 'R4', 'R5'], '`R0` – `R5`', 'General purpose: counters, pointers, values. Subroutines usually take arguments and give results in them, as the [ROM](rom)\'s `DRAWCH` does.'),
-      e('reg-SP', ['SP', 'R6'], '`SP` (R6)', 'The [stack](stack) pointer. Run sets it to the program\'s first address (1000); the stack grows down from there.'),
-      e('reg-PC', ['PC', 'R7'], '`PC` (R7)', 'The program counter: the address of the next instruction. Jumps and branches change it. `#`, `@#` and labels are [addressing modes](addressing) on the PC.'),
+      e('reg-SP', ['SP', 'R6'], '`SP` (R6)', 'The **stack pointer**: the address of the top of the [stack](stack), the word pushed last. A push moves SP down by 2 and stores a word there; a pop takes the word and moves SP up by 2. '
+        + 'Run sets it to the program\'s first address (1000), so the stack grows down from there. `JSR`, `RTS`, traps and interrupts all use it, so keep SP for the stack.'),
+      e('reg-PC', ['PC', 'R7'], '`PC` (R7)', 'The **program counter**: the address of the next instruction. The CPU reads the instruction at PC, moves PC past it, and runs it; a jump or branch just puts a new address into PC. '
+        + 'The highlighted line in the editor and the **Disassembly** is where PC is. `#`, `@#` and labels are [addressing modes on the PC](modes).'),
       e('reg-%', ['%0', '%1', '%2', '%3', '%4', '%5', '%6', '%7'], '`%n`', 'Register n by number: `PTR = %3` makes `PTR` another name for R3.'),
     ),
     h('The flags'),
     p('After most instructions the CPU notes four facts about the result, the **flags**. [Branches](ins-branch) test them to decide where to go: that is how a program makes decisions.'),
-    table(['Flag', 'Set when the result…'], [
-      ['**N** negative', 'has its top bit set (bit 15, or bit 7 for a byte)'],
-      ['**Z** zero', 'is 0'],
-      ['**V** overflow', 'is wrong as a signed number (e.g. 77777 + 1)'],
-      ['**C** carry', 'carried out of the top bit, or borrowed (unsigned overflow)'],
+    table(['Flag', 'Set when the result…', 'Example'], [
+      ['**N** negative', 'has its top bit set (bit 15, or bit 7 for a byte): negative as a [signed number](octal)', '`MOV #-5, R0`'],
+      ['**Z** zero', 'is 0', '`SUB #3, R0` with R0 = 3'],
+      ['**V** overflow', 'is wrong as a **signed** number: it did not fit in −100000…77777', '77777 + 1 = 100000: two positives gave a negative'],
+      ['**C** carry', 'is wrong as an **unsigned** number: it did not fit in 0…177777. For a subtract or compare: a **borrow**, the second number was bigger', '177777 + 1 = 0'],
     ]),
+    p('The CPU does not know whether you mean your numbers as signed or unsigned, so it sets both V and C, and you pick the branch that fits: `BLT` for signed, `BLO` for unsigned ([which branch?](ins-branch)).'),
     code(`
               MOV  #3, R0
               SUB  #3, R0         ; R0 = 0: Z is set
@@ -306,23 +372,27 @@ const registers: Section = {
     `, { run: true }),
     note('The flags belong to the **last** instruction that set them. In `CMP R0, #5` / `MOV #1, R1` / `BLT …` the branch tests the `MOV`. Compare just before you branch.'),
     p('Bit 7 is the sign of a byte, so devices put their DONE or READY flag there: `TSTB @#XCSR` then `BPL` waits for the console, with no mask.'),
+    h('The PSW'),
+    p('The flags live in the **processor status word** (PSW), together with the CPU\'s **priority** (bits 7–5): the level an [interrupt](interrupts) must be above to break in. '
+      + 'The **CPU** panel shows it. Programs rarely touch the PSW directly; each [vector](traps) holds a new PSW for its handler.'),
     entries(...symbolEntries('PSW')),
   ],
 };
 
 const addressing: Section = {
-  id: 'addressing', title: 'Addressing modes', group: LANGUAGE,
+  id: 'addressing', title: 'Addressing modes', group: MEMREG,
   blocks: [
-    p('An **addressing mode** says where an operand is: in a register, in memory, or in the instruction itself. Four of them cover most programs:'),
+    p('An **addressing mode** is the way an operand says where its value is: in a register, in memory, or written in the instruction itself. Four of them cover most programs:'),
     table(['Write', 'Means', 'Example'], [
       ['`R0`', 'the register', '`MOV R1, R0`: R0 = R1'],
-      ['`#n`', '**immediate**: the value n itself', '`MOV #5, R0`: R0 = 5'],
+      ['`#n`', '**immediate**: the value n itself, written in the instruction', '`MOV #5, R0`: R0 = 5'],
       ['`LABEL`', 'the word in memory at LABEL: a variable', '`INC COUNT`: add 1 to the variable COUNT'],
       ['`@#a`', '**absolute**: the word at address a. Use it for devices', '`MOV @#DSPFRM, R0`: R0 = the frame counter'],
     ]),
     note('**`#` is a value, `@#` is an address.** `MOV #DSPFRM, R0` puts the *address* 176602 into R0; `MOV @#DSPFRM, R0` reads the frame counter. Device registers always need `@#`.'),
     h('Pointers: walking through memory'),
-    p('A register can hold an address, a **pointer**. `(R1)` is the word R1 points at, and `(R1)+` also moves R1 on to the next one, which makes loops over a list or the screen short:'),
+    p('A register can hold an address instead of a value: then it is a **pointer**, it *points at* a place in memory. '
+      + 'Parentheses mean *go to that address*: `(R1)` is not R1, but the word at the address that is in R1. `(R1)+` does the same and then moves R1 on to the next word, which makes loops over a list or the screen short:'),
     code(`
               MOV  #LIST, R1     ; R1 points at the list
               CLR  R0
@@ -334,26 +404,62 @@ const addressing: Section = {
       END:
     `, { run: true }),
     p('The same loop with `MOVB R2, (R1)+` paints a row of pixels. The [stack](stack) uses `-(SP)` to push and `(SP)+` to pop.'),
-    h('All eight modes'),
-    p('Every operand is a register with one of eight modes. In the table, R is any register.'),
-    table(['Write', 'Mode', 'The operand is'], [
-      ['`R`', '0 register', 'the register itself'],
-      ['`(R)`', '1 deferred', 'the word at the address in R'],
-      ['`(R)+`', '2 autoincrement', 'the word at R; then R goes up by 2 (by 1 for a byte instruction)'],
-      ['`@(R)+`', '3 autoincrement deferred', 'the word whose address is at R; then R goes up by 2'],
-      ['`-(R)`', '4 autodecrement', 'R goes down by 2 (1 for bytes) first, then the word at R'],
-      ['`@-(R)`', '5 autodecrement deferred', 'R goes down by 2, then the word whose address is at R'],
-      ['`X(R)`', '6 index', 'the word at R + X; X is stored after the instruction'],
-      ['`@X(R)`', '7 index deferred', 'the word whose address is at R + X'],
-    ]),
-    p('A byte instruction steps by 1, except on SP and PC, which always step by 2.'),
+    p('There are eight modes in all. [Addressing modes in detail](modes) goes through each one with an example, and explains **deferred**.'),
+  ],
+};
+
+const modes: Section = {
+  id: 'modes', title: 'Addressing modes in detail', group: MEMREG,
+  blocks: [
+    p('Every operand is a register (R0–R7) plus one of eight **modes**: the mode says what to do with the register. In the examples, R1 holds 2000, and memory holds:'),
+    table(['Address', '2000', '2002', '2004', '3000'], [['Word', '`3000`', '`22`', '`33`', '`7`']]),
+    h('Deferred: one more step'),
+    p('**Deferred** (also called *indirect*) means: what you found is not the value but an **address**, so go there and take the word you find. '
+      + 'Parentheses `( )` defer once, from a register to memory. An `@` in front defers once more. '
+      + 'Think of a note that says *the answer is in drawer 2000*: plain `R1` is the note itself, `(R1)` is what is in drawer 2000, and `@(R1)+` finds another note in drawer 2000 and follows that one too.'),
+    entries(
+      e('mode-0', [], 'Mode 0, register: `R1`', 'The register itself. `MOV R1, R0`: R0 = 2000.'),
+      e('mode-1', [], 'Mode 1, register deferred: `(R1)`', 'The word at the address in R1. `MOV (R1), R0`: R0 = 3000, the word at 2000. R1 does not change.'),
+      e('mode-2', [], 'Mode 2, autoincrement: `(R1)+`', 'As `(R1)`, then R1 goes **up** by 2 (by 1 for a byte instruction), to the next word. `MOV (R1)+, R0`: R0 = 3000, then R1 = 2002. For stepping forward through a list, and for popping: `(SP)+`.'),
+      e('mode-3', [], 'Mode 3, autoincrement deferred: `@(R1)+`', 'R1 points at a list of **addresses**: take the address at R1, then the word at that address, then R1 goes up by 2. `MOV @(R1)+, R0`: the word at 2000 is 3000, the word at 3000 is 7, so R0 = 7, then R1 = 2002.'),
+      e('mode-4', [], 'Mode 4, autodecrement: `-(R1)`', 'R1 goes **down** by 2 (1 for bytes) **first**, then the word at the new R1. With R1 = 2002, `MOV -(R1), R0`: R1 = 2000, R0 = 3000. For stepping backwards, and for pushing: `-(SP)`.'),
+      e('mode-5', [], 'Mode 5, autodecrement deferred: `@-(R1)`', 'R1 goes down by 2, then as mode 3: the word at the address found at R1. Rarely needed.'),
+      e('mode-6', [], 'Mode 6, index: `X(R1)`', 'The word at R1 + X, where X is a number stored in the word after the instruction. R1 does not change. `MOV 4(R1), R0`: R0 = 33, the word at 2004. '
+        + 'For fields of a record (`4(R1)` is its third word), or the other way round, a table and a register as the index: `MOV TABLE(R2), R0`.'),
+      e('mode-7', [], 'Mode 7, index deferred: `@X(R1)`', 'The word at R1 + X is an address: take the word there. `MOV @0(R1), R0`: the word at 2000 is 3000, so R0 = 7.'),
+    ),
+    p('An **auto**increment or **auto**decrement steps by 2 for word instructions and 1 for byte instructions, except on SP and PC, which always step by 2 to stay even.'),
+    h('Try them'),
+    code(`
+              MOV  #LIST, R1      ; R1 = the address of LIST
+              MOV  (R1), R2       ; mode 1: R2 = the word R1 points at: 11
+              MOV  4(R1), R3      ; mode 6: R3 = the word 4 bytes on: 33
+              MOV  (R1)+, R4      ; mode 2: R4 = 11, then R1 = LIST+2
+              MOV  (R1)+, R5      ; mode 2: R5 = 22, then R1 = LIST+4
+              MOV  -(R1), R0      ; mode 4: R1 = LIST+2 first, then R0 = 22
+              HALT
+      LIST:   .WORD 11, 22, 33
+    `, { run: true }),
+    p('Deferred modes follow a list of addresses, for example a table of texts or of routines to call:'),
+    code(`
+              MOV  #PTRS, R1      ; R1 points at a list of addresses
+              MOV  @(R1)+, R2     ; mode 3: R2 = the word at A: 5
+              MOV  @(R1)+, R3     ; mode 3: R3 = the word at B: 6
+              MOV  #PTRS, R1
+              MOV  @2(R1), R4     ; mode 7: R4 = the word at the second address: 6
+              HALT
+      PTRS:   .WORD A, B          ; two addresses
+      A:      .WORD 5
+      B:      .WORD 6
+    `, { run: true }),
+    p('Step through them with **Step** (F10) and watch the registers in the **CPU** panel.'),
     h('On the PC'),
-    p('`#`, `@#` and labels are really modes on the PC (R7), which the assembler writes for you:'),
+    p('`#`, `@#` and labels are really these modes on the PC (R7), the register that points at the instruction being read. The assembler writes them for you:'),
     table(['Write', 'Is', 'Means'], [
-      ['`#n`', '`(PC)+`, mode 2', 'the value n, stored after the instruction'],
-      ['`@#a`', '`@(PC)+`, mode 3', 'the word at address a, stored after the instruction'],
-      ['`LABEL`', '`X(PC)`, mode 6', 'the word at LABEL, as a distance from the PC (**relative**)'],
-      ['`@LABEL`', '`@X(PC)`, mode 7', 'the word whose address is at LABEL'],
+      ['`#n`', '`(PC)+`, mode 2', '**immediate**: the value n, stored in the word after the instruction'],
+      ['`@#a`', '`@(PC)+`, mode 3', '**absolute**: the word at address a, stored after the instruction'],
+      ['`LABEL`', '`X(PC)`, mode 6', '**relative**: the word at LABEL, stored as its distance from the PC, so the program works wherever it is loaded'],
+      ['`@LABEL`', '`@X(PC)`, mode 7', 'relative deferred: the word whose address is at LABEL'],
     ]),
     p('The **Addressing modes tour** example shows every mode.'),
   ],
@@ -483,7 +589,7 @@ const instructions: Section = {
 // ------------------------------------------------------------------ The machine
 
 const memory: Section = {
-  id: 'memory', title: 'Memory', group: MACHINE,
+  id: 'memory', title: 'Memory', group: MEMREG,
   blocks: [
     p('Memory is 64 KB of bytes, each with a 16-bit **address**. A **word** is two bytes, **low byte first**, at an **even** address. '
       + 'Your program, its data, the screen and the devices all live in this one address space.'),
@@ -516,7 +622,7 @@ const memory: Section = {
     list(
       'Run starts from power-up: memory is cleared and the program loaded again, so `COUNT` starts at 0 each time.',
       'Words are at even addresses: a word access at an odd address is a trap. After `.BYTE` or `.ASCIZ`, add `.EVEN` before more words.',
-      'Byte instructions (`MOVB`, `CMPB`, `TSTB` …) reach any address. `MOVB` into a register sign-extends: byte 200–377 becomes negative.',
+      'Byte instructions (`MOVB`, `CMPB`, `TSTB` …) reach any address. `MOVB` into a register [sign-extends](octal): byte 200–377 becomes negative.',
       'Low byte first: `MOV #1403, @#SCREEN` puts 3 in the first pixel and 3 in the second (`1403` = 3 × 400 + 3).',
     ),
   ],
@@ -532,7 +638,7 @@ const cycles: Section = {
       ['`MOVB (R1)+, (R2)+`', '3'],
       ['`INC @#COUNT`', '4 (fetch, address, read, write)'],
       ['branches, `SOB`, `WAIT`, `HALT`, flag instructions', '1'],
-      ['`JSR PC, X`', '3 (fetch, displacement, push)'],
+      ['`JSR PC, X`', '3 (fetch, the word with X\'s offset, push)'],
       ['`RTS PC`', '2 (fetch, pop)'],
       ['`RTI`', '3 (fetch, pop PC, pop PSW)'],
       ['an interrupt or trap', '4 (push PSW, push PC, read the vector)'],
@@ -549,7 +655,7 @@ const cycles: Section = {
 };
 
 const stack: Section = {
-  id: 'stack', title: 'The stack and subroutines', group: MACHINE,
+  id: 'stack', title: 'The stack and subroutines', group: MEMREG,
   blocks: [
     p('The **stack** is a pile of words in memory: you put a word on top (**push**) and take the top one off (**pop**). SP points at the top. '
       + 'It grows **down**, below the program: Run sets SP to the program\'s first address (001000).'),
@@ -881,41 +987,68 @@ const glossary: Section = {
   blocks: [
     p('The words this help uses, in short. Follow a link for the whole story.'),
     entries(
+      e('gl-absolute', [], 'Absolute address `@#a`', 'An operand that names a fixed address: `@#DSPCS`. Used for devices. See [addressing](addressing).'),
       e('gl-address', [], 'Address', 'The number of a byte in [memory](memory), 0–177777.'),
+      e('gl-ascii', [], 'ASCII', 'The standard code for characters: A is 101, a is 141, 0 is 60, a space is 40. `\'A` in a program gives the code of A.'),
       e('gl-assembler', [], 'Assembler', 'The program that turns your text into machine code. See [Writing assembly](assembler).'),
-      e('gl-bit', [], 'Bit, byte, word', 'A bit is 0 or 1. A byte is 8 bits (0–377). A word is 16 bits, two bytes (0–177777). See [octal](octal).'),
+      e('gl-auto', [], 'Autoincrement, autodecrement', 'Addressing modes that move a pointer register on (`(R1)+`) or back (`-(R1)`) each time it is used. See [modes](modes#mode-2).'),
+      e('gl-bit', [], 'Bit, byte, word', 'A bit is 0 or 1. A byte is 8 bits (0–377). A word is 16 bits, two bytes (0–177777). See [numbers](octal).'),
       e('gl-blank', [], 'Vertical blank', 'The moment, once a frame, when the display starts a new picture. See [frames](display-frames).'),
+      e('gl-bus', [], 'Bus error', 'A trap: the program read or wrote a word at an odd address, an address where nothing is, or the ROM. See [traps](traps).'),
+      e('gl-byteform', [], 'Byte form', 'The version of an instruction that works on a byte instead of a word, with a B at the end: `MOVB`, `CMPB`.'),
+      e('gl-carry', [], 'Carry (C), overflow (V)', 'Flags for a result that did not fit: C as an unsigned number, V as a signed one. See [flags](registers).'),
       e('gl-cycle', [], 'Cycle', 'One trip to memory: the unit of time. See [cycles](cycles).'),
+      e('gl-deferred', [], 'Deferred (indirect)', 'An operand whose value is an **address**: the CPU goes there and takes the word it finds. Written with `( )` or `@`: `(R1)`, `@(R1)+`, `@#DSPCS`. See [deferred](modes).'),
       e('gl-device', [], 'Device, device register', 'A part of the machine besides the CPU and memory: the console, clock, display, keyboard. Programs talk to it through its registers, words at fixed addresses: `@#DSPCS`.'),
       e('gl-directive', [], 'Directive', 'A line for the assembler, not the CPU, starting with a dot: `.WORD`. See [directives](directives).'),
+      e('gl-double', [], 'Double buffering', 'Drawing on a page that is not shown, then showing it, so the picture never shows half a drawing. See [frames and pages](display-frames).'),
+      e('gl-eis', [], 'EIS', 'The *Extended Instruction Set*: `MUL`, `DIV`, `ASH`, `ASHC`. A setting turns it on. See [multiply and divide](ins-eis).'),
       e('gl-flag', [], 'Flag', 'One of the four bits N Z V C that describe the last result. Branches test them. See [flags](registers).'),
       e('gl-frame', [], 'Frame', `${dec(FRAME)} cycles, one picture on the screen, a 60th of a second.`),
       e('gl-handler', [], 'Handler', 'The code that runs on an interrupt or a trap. It ends with `RTI`.'),
       e('gl-ie', [], 'IE, DONE, READY', 'Common bits in a device\'s status register: IE (bit 6) turns its interrupt on; DONE or READY (bit 7) says it has something, or is ready for more.'),
+      e('gl-illegal', [], 'Illegal instruction', 'A trap: the CPU met a word that is not an instruction, often data it ran into by mistake. See [traps](traps).'),
+      e('gl-immediate', [], 'Immediate `#n`', 'An operand that is a value written in the instruction: `MOV #5, R0`. See [addressing](addressing).'),
+      e('gl-index', [], 'Index mode `X(R)`', 'The word at the address R + X: `4(R1)`, `TABLE(R2)`. See [modes](modes#mode-6).'),
       e('gl-interrupt', [], 'Interrupt', 'A device breaking in to run a handler. See [interrupts](interrupts).'),
+      e('gl-jumptable', [], 'Jump table', 'A list of `JMP` instructions (or addresses) at fixed places, so callers find a routine even when it moves. The ROM\'s `DRAWCH` is one.'),
       e('gl-label', [], 'Label', 'A name for a line, and so for its address: `LOOP:`.'),
+      e('gl-lc', [], 'Location counter `.`', 'The address the assembler is writing at. `. = 2000` moves it. See [Writing assembly](assembler).'),
+      e('gl-lowbyte', [], 'Low byte first', 'How a word sits in memory: its low 8 bits at the even address, its high 8 bits at the next one. See [memory](memory).'),
+      e('gl-machinecode', [], 'Machine code', 'The numbers the CPU actually runs. The **Listing** tab shows the words each line became.'),
       e('gl-mask', [], 'Mask', 'A number whose 1 bits pick the bits to test, set or clear: `BIT #200, R0`.'),
-      e('gl-mode', [], 'Addressing mode', 'How an operand says where its value is: `R0`, `#5`, `(R1)+`, `@#DSPCS`. See [addressing](addressing).'),
-      e('gl-octal', [], 'Octal', 'Base 8. Blue-11\'s numbers are octal unless they end in a dot. See [octal](octal).'),
-      e('gl-operand', [], 'Operand', 'What an instruction works on: `MOV src, dst` has two.'),
+      e('gl-mode', [], 'Addressing mode', 'How an operand says where its value is: `R0`, `#5`, `(R1)+`, `@#DSPCS`. See [addressing](addressing) and [in detail](modes).'),
+      e('gl-octal', [], 'Octal', 'Base 8. Blue-11\'s numbers are octal unless they end in a dot. See [numbers](octal).'),
+      e('gl-offset', [], 'Offset', 'A distance from an address. A branch, or a label used as an operand, is stored as an offset from the PC.'),
+      e('gl-operand', [], 'Operand', 'What an instruction works on: `MOV src, dst` has two, the source and the destination.'),
       e('gl-page', [], 'Page', 'One screenful of pixel memory. See [display](display).'),
       e('gl-palette', [], 'Palette', 'The table that gives each colour number its colour. See [colours](palette).'),
+      e('gl-pc', [], 'PC (program counter)', 'Register R7: the address of the next instruction. See [registers](registers#reg-PC).'),
+      e('gl-pointer', [], 'Pointer', 'A register or word that holds an address: it *points at* something in memory. See [pointers](addressing).'),
       e('gl-polling', [], 'Polling', 'Asking a device again and again in a loop whether it is ready, instead of waiting for an interrupt.'),
+      e('gl-priority', [], 'Priority', 'Bits 7–5 of the PSW, 0–7. A device interrupts only if its level is above the CPU\'s priority. See [interrupts](interrupts).'),
+      e('gl-psw', [], 'PSW (processor status word)', 'The word with the flags and the priority. See [registers](registers).'),
       e('gl-register', [], 'Register', 'A 16-bit storage place in the CPU, R0–R7. See [registers](registers). Devices have registers too: words in memory.'),
-      e('gl-sign', [], 'Signed, unsigned', 'The same 16 bits read as 0 to 177777 (unsigned), or with the top bit meaning negative (signed): 177777 is 65535. or −1.'),
-      e('gl-stack', [], 'Stack, push, pop', 'A pile of words in memory that SP points at. See [the stack](stack).'),
-      e('gl-subroutine', [], 'Subroutine', 'Code called with `JSR PC` that returns with `RTS PC`.'),
+      e('gl-relative', [], 'Relative address', 'A label as an operand: `INC COUNT`. Stored as an offset from the PC, so the program works wherever it is loaded. See [modes on the PC](modes).'),
+      e('gl-sign', [], 'Signed, unsigned', 'The same 16 bits read as 0 to 177777 (unsigned), or with the top bit meaning negative (signed): 177777 is 65535. or −1. See [negative numbers](octal).'),
+      e('gl-signext', [], 'Sign extension', 'Copying a byte\'s top bit into the high byte when `MOVB` puts it in a register, so a negative byte stays negative: 377 becomes 177777. See [negative numbers](octal).'),
+      e('gl-sp', [], 'SP (stack pointer)', 'Register R6: the address of the top of the stack. See [registers](registers#reg-SP).'),
+      e('gl-stack', [], 'Stack, push, pop', 'A pile of words in memory that SP points at: push puts a word on top, pop takes the top one off. See [the stack](stack).'),
+      e('gl-subroutine', [], 'Subroutine', 'Code called with `JSR PC` that returns with `RTS PC`. See [the stack](stack).'),
+      e('gl-tearing', [], 'Tearing', 'Part of the screen showing the old picture and part the new, because the program drew while the beam was reading. See [the beam](display-frames#dsp-beam).'),
       e('gl-trap', [], 'Trap', 'The CPU\'s jump to a handler when something goes wrong, or on a trap instruction. See [traps](traps).'),
-      e('gl-vector', [], 'Vector', 'Two words in low memory: where a handler is, and the PSW to run it with.'),
+      e('gl-twos', [], 'Two\'s complement', 'How negative numbers are stored: invert every bit and add 1. −1 is 177777. See [negative numbers](octal).'),
+      e('gl-vector', [], 'Vector', 'Two words in low memory: where a handler is, and the PSW to run it with. See [traps](traps).'),
     ),
   ],
 };
 
 const SECTIONS_NO_INDEX: Section[] = [
   start, octalSection, running, debugging, problems,
-  assembler, directives, registers, addressing,
+  assembler, directives,
+  bigPicture, registers, memory, addressing, modes, stack,
   instructions, ...instructionPages,
-  memory, cycles, stack, traps, interrupts,
+  cycles, traps, interrupts,
   consoleSection, clock, display, displayFrames, palette, keyboard, keyboardEvents, rom,
 ];
 

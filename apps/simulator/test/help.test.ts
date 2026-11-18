@@ -123,8 +123,14 @@ describe('help examples', () => {
     expect([mem[0], mem[2], mem[3]]).toEqual([1, 0o30, 'I'.charCodeAt(0)]);
     expect(run('traps').cpu.r[1]).not.toBe(0);
     expect(run('registers').cpu.r[7] - 2).toBe(0o1014); // the HALT at ZERO
+    // the big picture: R0 = 3 + 5, stored at C (1022), and the HALT at 1014 as its table says
+    const big = run('computer');
+    expect([big.cpu.r[0], big.machine.read(0o1022, false), big.cpu.r[7]]).toEqual([0o10, 0o10, 0o1016]);
     expect(run('directives').cpu.r.slice(0, 2)).toEqual([3, 0o1014]);
     expect(run('ins-move').cpu.r.slice(0, 3)).toEqual([0, 5, 0o101]);
+    // R0 R1 R2 R3 R4 R5 after the mode tour; LIST is at 1022
+    expect(run('modes', 0).cpu.r.slice(0, 6)).toEqual([0o22, 0o1024, 0o11, 0o33, 0o11, 0o22]);
+    expect(run('modes', 1).cpu.r.slice(2, 5)).toEqual([5, 6, 6]);
     expect(run('ins-arith').cpu.r[0]).toBe(0o177763);
     expect(run('ins-logic').cpu.r[0]).toBe(0o334);
     expect(run('ins-branch', 0).cpu.r[0]).toBe(7);

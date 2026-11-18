@@ -170,3 +170,24 @@ describe('recordings (replays saved to a file)', () => {
     expect(parseRecording(JSON.stringify({ ...ok, inputs: [{ cycle: 5, kind: 'key', code: 400, down: true }] }))).toMatch(/input log/);
   });
 });
+
+describe('the screen when the program has ended', () => {
+  it('shows memory as it is, also for a program that halts within its first frame', () => {
+    const s = new Simulator();
+    expect(s.load('        MOVB #16, @#SCREEN+4040\n        HALT\n')).toEqual([]);
+    expect(s.ended).toBe(false);
+    expect(s.runFrame().stop).toBe('halt');
+    expect(s.ended).toBe(true);
+    expect(s.display.frame.pixels[0o40 * 64 + 0o40]).toBe(0); // no frame has been latched since
+    const f = s.screenNow();
+    expect([f.width, f.pixels[0o40 * 64 + 0o40]]).toEqual([64, 0o16]);
+  });
+
+  it('follows the page and the mode that DSPCS selects', () => {
+    const s = new Simulator();
+    expect(s.load('        MOVB #103, @#SCREEN+20000+100\n        MOV #5, @#DSPCS\n        HALT\n')).toEqual([]);
+    s.runFrame();
+    const f = s.screenNow(); // mode 1, page 1: row 1, x 0 is 3 and x 1 is 4
+    expect([f.width, f.pixels[128], f.pixels[129]]).toEqual([128, 3, 4]);
+  });
+});

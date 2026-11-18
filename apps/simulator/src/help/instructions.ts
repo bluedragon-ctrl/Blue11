@@ -37,7 +37,7 @@ export const OP_GROUPS: OpGroup[] = [
     title: 'Moving data',
     intro: 'A **(B)** in the name means the instruction has a byte form too: `MOV` copies a word, `MOVB` a byte.',
     ops: [
-      wb('MOV', 'MOV src, dst', '**0-', 'Copy `src` to `dst`. `MOV #5, R0` puts 5 into R0. `MOVB` into a register **sign-extends**: the byte 377 becomes 177777 (−1).'),
+      wb('MOV', 'MOV src, dst', '**0-', 'Copy `src` to `dst`. `MOV #5, R0` puts 5 into R0. `MOVB` into a register **sign-extends** ([why](octal)): the byte 377 becomes 177777 (−1).'),
       wb('CLR', 'CLR dst', '0100', 'Set `dst` to 0.'),
       op('SWAB', 'SWAB dst', '**00', 'Swap the two bytes of a word. N and Z come from the new low byte.'),
       op('SXT', 'SXT dst', '-*0-', '`dst` = 0 if N is clear, 177777 if N is set: extends a sign into a whole word.'),
