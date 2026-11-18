@@ -57,3 +57,15 @@ describe('programs shared by URL', () => {
     expect(sharedProgram('#code=' + btoa('\xff\xfe').replace(/=+$/, ''))).toBeNull(); // not UTF-8
   });
 });
+
+describe('the retro look', () => {
+  it('is on unless turned off, and is remembered', () => {
+    const store = memory();
+    expect(new Library(store).retro).toBe(true);
+    new Library(store).retro = false;
+    expect(new Library(store).retro).toBe(false);
+    new Library(store).retro = true;
+    expect(new Library(store).retro).toBe(true);
+    expect(new Library(null).retro).toBe(true);
+  });
+});

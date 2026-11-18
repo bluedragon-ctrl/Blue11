@@ -49,13 +49,19 @@ main > .code { display: flex; flex-direction: column; height: calc(100vh - 5.5re
 .view { display: flex; flex-direction: column; gap: 0.5rem; font-size: 0.8rem; }
 .view[hidden] { display: none; }
 #view-screen { align-items: center; }
-#screen { width: min(100%, 512px); aspect-ratio: 1; image-rendering: pixelated; background: #000; border: 1px solid var(--line); outline: none; }
+.crt { --rows: 64; --tube: 1px; position: relative; width: min(100%, 512px); }
+#screen { display: block; width: 100%; aspect-ratio: 1; image-rendering: pixelated; background: #000; border: 1px solid var(--line); outline: none; }
+.beam-row { position: absolute; left: -6px; right: -6px; height: 0; border-top: 1px dashed #ff4d4d; pointer-events: none; }
+.beam-row::before, .beam-row::after { content: ''; position: absolute; top: -5px; border: 4px solid transparent; }
+.beam-row::before { left: 0; border-left-color: #ff4d4d; }
+.beam-row::after { right: 0; border-right-color: #ff4d4d; }
+.beam-row[hidden] { display: none; }
 #screen:focus { border-color: var(--accent); box-shadow: 0 0 12px #39d0ff60; }
 .keys-hint { align-self: stretch; font-family: system-ui, sans-serif; font-size: 0.88rem; border-left: 3px solid var(--accent); background: #39d0ff12; padding: 0.3rem 0.6rem; }
 .keys-hint:empty { display: none; }
 .focus-label { color: var(--accent); font-size: 0.8rem; text-shadow: 0 0 6px var(--accent); }
 .focus-label[hidden] { display: none; }
-.screen-info { opacity: 0.75; white-space: pre; text-align: center; }
+.screen-info { opacity: 0.75; white-space: pre-wrap; text-align: center; }
 .mv-box { background: #000; border: 1px solid var(--line); padding: 0.35rem 0.5rem; white-space: pre; overflow-x: auto; }
 .mv-listing { max-height: calc(100vh - 26rem); min-height: 12rem; overflow: auto; padding: 0.25rem 0; }
 .mv-listing .lrow { padding: 0 0.5rem; white-space: pre; }
@@ -92,3 +98,54 @@ pre { margin: 0; padding: 0.5rem; background: #000; border: 1px solid var(--line
 .cm-error-line { background: #ff4d4d1f; }
 .cm-asm-error { color: var(--warn); margin-left: 2ch; font-style: italic; }
 .cm-asm-error::before { content: '← '; }
+
+/* console cursor: where typed characters go; it blinks while the console has focus */
+#output::after { content: '\2588'; opacity: 0.5; }
+#output:focus::after { opacity: 1; animation: blink 1.06s step-end infinite; }
+@keyframes blink { 50% { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { #output:focus::after { animation: none; } }
+
+/*
+ * Retro (body.retro): the period look for the machine's own views. The editor and the
+ * debugger stay as they are. Nothing here moves or blurs a pixel or a character.
+ */
+
+/* the screen: a CRT in its bezel, one faint scanline per row the machine draws */
+.retro .crt {
+  --tube: 22px; width: min(100%, 552px); padding: 20px; border-radius: 22px;
+  background: linear-gradient(160deg, #2a2a2e, #141416 60%, #0c0c0e);
+  box-shadow: inset 0 2px 1px #ffffff14, inset 0 -3px 6px #000c, 0 6px 18px #000a;
+}
+.retro #screen { border: 2px solid #000; border-radius: 4px; box-shadow: 0 0 18px #6fb8ff33, 0 0 2px #000 inset; }
+.retro #screen:focus { border-color: #000; box-shadow: 0 0 22px #39d0ff70; }
+.retro .crt::after {
+  content: ''; position: absolute; inset: 22px; border-radius: 3px; pointer-events: none;
+  background:
+    radial-gradient(ellipse at center, transparent 62%, #0000004d 100%),
+    linear-gradient(to bottom, transparent 72%, #00000038 72%) 0 0 / 100% calc(100% / var(--rows)),
+    linear-gradient(165deg, #ffffff0d, transparent 40%);
+}
+.retro .beam-row { left: 14px; right: 14px; }
+
+/* the listings: printed by a line printer on green-bar fan-fold paper */
+.retro .mv-listing {
+  --lh: 1.3rem; --margin: 1.7rem;
+  color: #222; line-height: var(--lh); padding: 0 var(--margin);
+  border: none; border-radius: 2px;
+  background:
+    radial-gradient(circle, #05070d 0.3rem, transparent 0.33rem) left calc(var(--margin) / 2 - 0.85rem) top 0 / 1.7rem calc(var(--lh) * 2) repeat-y,
+    radial-gradient(circle, #05070d 0.3rem, transparent 0.33rem) right calc(var(--margin) / 2 - 0.85rem) top 0 / 1.7rem calc(var(--lh) * 2) repeat-y,
+    linear-gradient(to right, transparent calc(var(--margin) - 1px), #c9cdbd calc(var(--margin) - 1px), #c9cdbd var(--margin), transparent var(--margin), transparent calc(100% - var(--margin)), #c9cdbd calc(100% - var(--margin)), #c9cdbd calc(100% - var(--margin) + 1px), transparent calc(100% - var(--margin) + 1px)),
+    repeating-linear-gradient(to bottom, #dcebd3 0, #dcebd3 calc(var(--lh) * 3), #f7f6ec calc(var(--lh) * 3), #f7f6ec calc(var(--lh) * 6));
+  background-attachment: local;
+}
+.retro .mv-listing .lrow { padding: 0 0.6rem; }
+.retro .mv-listing .lrow.pc { background: #ffe94a99; color: #000; box-shadow: none; }
+.retro .mv-listing .empty { opacity: 0.75; padding: 0 0.6rem; }
+.retro .mv-listing::-webkit-scrollbar { width: 10px; height: 10px; }
+.retro .mv-listing::-webkit-scrollbar-thumb { background: #b8bfa9; border-radius: 5px; }
+
+/* the console: an amber terminal */
+.retro #output { background: #0e0a03; color: #ffb000; border-color: #3a2a08; text-shadow: 0 0 3px #ffb00066; }
+.retro #output:focus { border-color: #ffb000; box-shadow: 0 0 10px #ffb00033; }
+.retro .console h2 { color: #ffb000; }
