@@ -3,7 +3,7 @@
  * renders it), so the content, search and F1 lookup are tested (test/help.test.ts). Ported
  * from HackCode's in-game help (its src/ui/help/), which works the same way.
  *
- * Inline markup in any text: `code`, **bold**, and links [label](section) or
+ * Inline markup in any text: `code`, **bold**, *italic*, and links [label](section) or
  * [label](section#anchor).
  */
 
@@ -66,9 +66,10 @@ export type Span =
   | { kind: 'text'; text: string }
   | { kind: 'code'; text: string }
   | { kind: 'bold'; text: string }
+  | { kind: 'italic'; text: string }
   | { kind: 'link'; text: string; section: string; anchor?: string };
 
-const INLINE = /`([^`]+)`|\*\*([^*]+)\*\*|\[([^\]]+)\]\(([\w-]+)(?:#([\w.$-]+))?\)/g;
+const INLINE = /`([^`]+)`|\*\*([^*]+)\*\*|\*([^*\s][^*]*)\*|\[([^\]]+)\]\(([\w-]+)(?:#([\w.$-]+))?\)/g;
 
 export function parseInline(text: string): Span[] {
   const out: Span[] = [];
@@ -77,7 +78,8 @@ export function parseInline(text: string): Span[] {
     if (m.index > last) out.push({ kind: 'text', text: text.slice(last, m.index) });
     if (m[1] !== undefined) out.push({ kind: 'code', text: m[1] });
     else if (m[2] !== undefined) out.push({ kind: 'bold', text: m[2] });
-    else out.push({ kind: 'link', text: m[3], section: m[4], ...(m[5] ? { anchor: m[5] } : {}) });
+    else if (m[3] !== undefined) out.push({ kind: 'italic', text: m[3] });
+    else out.push({ kind: 'link', text: m[4], section: m[5], ...(m[6] ? { anchor: m[6] } : {}) });
     last = m.index + m[0].length;
   }
   if (last < text.length) out.push({ kind: 'text', text: text.slice(last) });

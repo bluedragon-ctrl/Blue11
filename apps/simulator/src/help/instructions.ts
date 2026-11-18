@@ -9,6 +9,8 @@
 import type { Entry } from './model';
 
 export interface OpGroup {
+  /** The help section it is shown in (several groups can share one). */
+  section: string;
   title: string;
   intro: string;
   ops: OpHelp[];
@@ -31,6 +33,7 @@ const wb = (name: string, syntax: string, flags: string, text: string): OpHelp =
 
 export const OP_GROUPS: OpGroup[] = [
   {
+    section: 'ins-move',
     title: 'Moving data',
     intro: 'A **(B)** in the name means the instruction has a byte form too: `MOV` copies a word, `MOVB` a byte.',
     ops: [
@@ -41,19 +44,21 @@ export const OP_GROUPS: OpGroup[] = [
     ],
   },
   {
+    section: 'ins-arith',
     title: 'Arithmetic',
-    intro: 'All arithmetic is 16-bit. C is the carry (unsigned overflow), V the signed overflow.',
+    intro: 'Numbers are 16-bit words: 0 to 177777 (65535.) unsigned, or −100000 to 77777 (−32768. to 32767.) signed. A result that does not fit wraps around, and a flag tells you: **C** (carry) for unsigned numbers, **V** (overflow) for signed ones.',
     ops: [
       op('ADD', 'ADD src, dst', '****', '`dst` = `dst` + `src`.'),
       op('SUB', 'SUB src, dst', '****', '`dst` = `dst` − `src`. C is set on a borrow (`src` was bigger, unsigned).'),
       wb('INC', 'INC dst', '***-', 'Add 1. C is not changed, so `INC` can count inside multi-word arithmetic.'),
       wb('DEC', 'DEC dst', '***-', 'Subtract 1. C is not changed.'),
       wb('NEG', 'NEG dst', '****', '`dst` = −`dst` (two\'s complement).'),
-      wb('CMP', 'CMP src, dst', '****', 'Compute `src` − `dst`, set the flags, store nothing. Note the order: `CMP R0, #10` then `BLT` branches if R0 < 10. See [branches](instructions#op-BLT).'),
+      wb('CMP', 'CMP src, dst', '****', 'Compute `src` − `dst`, set the flags, store nothing. Note the order: `CMP R0, #10` then `BLT` branches if R0 < 10. See [branches](ins-branch#op-BLT).'),
       wb('TST', 'TST dst', '**00', 'Set N and Z from `dst`: `TST R0` then `BEQ` branches if R0 is 0. `TSTB @#XCSR` puts the console\'s READY bit (bit 7) into N.'),
     ],
   },
   {
+    section: 'ins-logic',
     title: 'Bits and logic',
     intro: 'A mask says which bits: `BIT #200, @#DSPCS` tests bit 7, `BIS #100, @#KBDCS` sets bit 6 (IE), `BIC #177600, R0` keeps bits 6–0.',
     ops: [
@@ -65,8 +70,9 @@ export const OP_GROUPS: OpGroup[] = [
     ],
   },
   {
+    section: 'ins-logic',
     title: 'Shifts and rotates',
-    intro: 'One bit at a time; the bit shifted out goes into C. V is N xor C after the shift.',
+    intro: 'Move every bit one place left or right. The bit that falls off the end goes into C. (V is set to N xor C.)',
     ops: [
       wb('ASL', 'ASL dst', '****', 'Shift left, 0 comes in: multiply by 2.'),
       wb('ASR', 'ASR dst', '****', 'Shift right, the sign bit is kept: divide a signed number by 2, rounding down.'),
@@ -75,9 +81,11 @@ export const OP_GROUPS: OpGroup[] = [
     ],
   },
   {
+    section: 'ins-branch',
     title: 'Branches',
-    intro: 'A branch tests the flags left by the **last** instruction that set them, usually a `CMP`, `TST` or `BIT` just before. '
-      + 'It reaches at most 127 words forward or 128 back; further away, branch around a `JMP`. Branches change no flags.',
+    intro: 'A branch is an *if*: it jumps to the label when its condition holds, and otherwise goes on with the next line. '
+      + 'It tests the flags left by the **last** instruction that set them, so put the `CMP`, `TST` or `BIT` just before it. '
+      + 'A branch reaches at most 127 words forward or 128 back; to go further, branch around a `JMP`. Branches change no flags.',
     ops: [
       op('BR', 'BR label', '----', 'Always branch.'),
       op('BEQ', 'BEQ label', '----', 'Branch if Z: equal, or zero.'),
@@ -98,8 +106,9 @@ export const OP_GROUPS: OpGroup[] = [
     ],
   },
   {
+    section: 'ins-jump',
     title: 'Jumps and subroutines',
-    intro: 'See [the stack](stack) for how calls use it.',
+    intro: '`JMP` goes somewhere else for good. `JSR` calls a subroutine, which comes back with `RTS`. See [the stack](stack) for how a call remembers where to return.',
     ops: [
       op('JMP', 'JMP dst', '----', 'Jump to the address of `dst`: `JMP LOOP`, or through a table: `JMP @TABLE(R1)`. A register as `dst` (`JMP R0`) is illegal and traps.'),
       op('JSR', 'JSR R, dst', '----', 'Call a subroutine: push `R`, put the return address in `R`, jump to `dst`. Nearly always `JSR PC, NAME`, which just pushes the return address.'),
@@ -107,6 +116,7 @@ export const OP_GROUPS: OpGroup[] = [
     ],
   },
   {
+    section: 'ins-trap',
     title: 'Traps and interrupts',
     intro: 'A trap pushes the PSW and the PC and loads both from a **vector**, a pair of words in low memory. See [traps](traps) and [interrupts](interrupts).',
     ops: [
@@ -118,8 +128,9 @@ export const OP_GROUPS: OpGroup[] = [
     ],
   },
   {
+    section: 'ins-control',
     title: 'CPU control and flags',
-    intro: '',
+    intro: 'Stopping, doing nothing, and setting C by hand.',
     ops: [
       op('HALT', 'HALT', '----', 'Stop the program. The status line shows where. A program that loops forever (a game) needs none: Pause stops it.'),
       op('NOP', 'NOP', '----', 'Do nothing (one cycle).'),
@@ -128,6 +139,7 @@ export const OP_GROUPS: OpGroup[] = [
     ],
   },
   {
+    section: 'ins-eis',
     title: 'Multiply and divide (EIS)',
     intro: 'The **EIS** instructions (the Extended Instruction Set) work only with the **EIS** setting on; without it they trap to 10 ([illegal instruction](traps)), as on a machine without the option. '
       + 'Without EIS, multiply by shifting and adding (the `DIV16` routine in the examples divides that way). `R` must be a register; an even one (R0, R2, R4) holds a 32-bit value in `R` (high word) and `R+1` (low).',
@@ -139,6 +151,7 @@ export const OP_GROUPS: OpGroup[] = [
     ],
   },
   {
+    section: 'ins-other',
     title: 'Less common',
     intro: 'Part of the instruction set, needed less often. They work as described.',
     ops: [

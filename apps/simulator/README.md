@@ -34,9 +34,12 @@ deployed to GitHub Pages from `main`: **[bluedragon-ctrl.github.io/Blue11](https
   program again and feeds the log at the same cycles, so the run happens again exactly.
   **Save** writes the program, its settings and the log to a `.replay.json` file; **Open**
   plays one.
-- **Help** (the button, or F1): the instructions, addressing modes, assembler, the machine
-  (memory, cycles, the stack, traps, interrupts), the devices (console, line clock, display,
-  keyboard), the ROM's routines and every predefined name, with a search. **F1 in the editor**
+- **Help** (the button, or F1): short pages for students, read in order with Previous / Next
+  links: getting started (a first program, octal numbers, running, debugging, the usual
+  mistakes), the assembler and its directives, registers, addressing modes, the instructions
+  (an overview, then a page per group, with examples), the machine (memory, cycles, the stack,
+  traps, interrupts), the devices (console, line clock, display, keyboard), the ROM's
+  routines, every predefined name and a glossary, with a search. **F1 in the editor**
   opens it at the word under the cursor (an instruction, a register, a directive, a device
   name), and resting the mouse on one shows its entry in a tooltip. It is HackCode's help
   (`src/ui/help/` there), ported with the simulator's own text.
