@@ -19,9 +19,9 @@ README as a departure from the original machine.
   npm workspaces, with a build to ESM plus types, an MIT licence, CI, and publishing to npm.
 - **`blue11` 0.1.0 on npm** (2026-11-18), published from CI with provenance.
 
-1. **HackCode uses the package** (in HackCode): depend on `blue11` ^0.1 and delete its
-   `src/blue11/`, `tests/blue11/` and `src/simulator/`. **Done when:** HackCode's tests and build
-   pass unchanged.
+1. ~~**HackCode uses the package**~~ (done, 2026-11-18, in HackCode): it depends on `blue11`
+   ^0.1.0; its copies of the library, tests, examples and docs are deleted, and its 309 tests and
+   build pass unchanged.
 2. **The display in the library:** the `Display` device as in the spec, with both beams, and a
    general `Rom` device (HackCode's, made general). Also their tests (spec §10), a README
    section, the departure listed, and a minor version.
