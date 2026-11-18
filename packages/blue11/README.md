@@ -2,10 +2,11 @@
 
 A self-contained TypeScript library. The Blue-11 implements the PDP-11 instruction set (a
 subset of its assembler syntax): the /40 model's set with the EIS option, an assembler, a
-disassembler, a bus with pluggable memory-mapped devices, and DEC's console and line clock. No dependencies. MIT licence.
+disassembler, a bus with pluggable memory-mapped devices, DEC's console and line clock, a
+read-only memory, and a framebuffer display for teaching graphics. No dependencies. MIT licence.
 Its first users are [HackCode](https://github.com/bluedragon-ctrl/HackCode), a game, and the Blue-11
 simulator (to come). Design and rationale: [`docs/BLUE11_MACHINE.md`](https://github.com/bluedragon-ctrl/Blue11/blob/main/docs/BLUE11_MACHINE.md);
-devices to come: [`BLUE11_DISPLAY.md`](https://github.com/bluedragon-ctrl/Blue11/blob/main/docs/BLUE11_DISPLAY.md), [`BLUE11_KEYBOARD.md`](https://github.com/bluedragon-ctrl/Blue11/blob/main/docs/BLUE11_KEYBOARD.md).
+the display: [`BLUE11_DISPLAY.md`](https://github.com/bluedragon-ctrl/Blue11/blob/main/docs/BLUE11_DISPLAY.md); to come: [`BLUE11_KEYBOARD.md`](https://github.com/bluedragon-ctrl/Blue11/blob/main/docs/BLUE11_KEYBOARD.md).
 
 ```sh
 npm install blue11
@@ -23,16 +24,18 @@ test fails if a block here isn't in it. If you change an example, change both.
 5. [CPU](#cpu)
 6. [DeviceMachine and devices](#devicemachine-and-devices)
 7. [SimpleMachine](#simplemachine)
-8. [Host recipes](#host-recipes): keyboard, coverage, system calls, breakpoints, snapshots, disassembly
-9. [Disassembler, ISA tables, CodeMirror](#disassembler-isa-tables-codemirror)
-10. [Pitfalls](#pitfalls)
-11. [Working on the library](#working-on-the-library) (→ `AGENTS.md`)
+8. [Display](#display): a framebuffer, two modes, 16 colours, an optional scanning beam
+9. [Host recipes](#host-recipes): keyboard, coverage, system calls, breakpoints, snapshots, disassembly
+10. [Disassembler, ISA tables, CodeMirror](#disassembler-isa-tables-codemirror)
+11. [Pitfalls](#pitfalls)
+12. [Working on the library](#working-on-the-library) (→ `AGENTS.md`)
 
 ## Which layer to use
 
 | You want | Use |
 | :--- | :--- |
 | Run a program with a console (print, keyboard) and a clock | `SimpleMachine` |
+| … and a screen to draw on | `SimpleMachine({ display: true })` |
 | Your own memory-mapped hardware (sensors, motors, displays), as HackCode's robot does | `DeviceMachine` + your `Device` classes (+ `DL11` / `KW11L` if wanted) |
 | Your own memory map, protection, or timing model | `Cpu` with your own `Bus` |
 | Turn source into bytes, a listing, line numbers | `assemble` |
@@ -284,7 +287,8 @@ later; `RESET` calls `bus.reset()`; `JSR PC, @(SP)+` pops the target before push
 models differed; 10 is the illegal-instruction vector). Not implemented: `MARK`, `SPL`,
 `MFPI`/`MTPI`, `MFPS`/`MTPS`, floating point, memory management. With `protectModes` the
 mode rules are the /45 model's, without its memory management: protect memory yourself by
-refusing writes in `bus.write`.
+refusing writes in `bus.write`. The [display](#display) is a teaching device DEC never made:
+its registers, vector and behaviour are ours (it borrows DEC's CSR bits).
 
 **Hosting the CPU yourself** (your own `Bus`):
 - Give `run` a budget per step of your program (a frame, a tick) and subtract
@@ -381,13 +385,73 @@ is always ready. A receive request is withdrawn when IE is cleared or RBUF is re
 line clock LKS at `177546`, vector 100, level 6; sets DONE every `cycles` CPU cycles and
 interrupts if IE. CSR bits: `CSR.DONE` (200), `CSR.IE` (100).
 
+**`Rom`.** `new Rom({ base, size })`: read-only memory whose contents the host loads, such as a
+BIOS or a font. `load(bytes, offset = 0)` copies an image in (it throws if it doesn't fit), and
+`bytes` is the contents. The program reads it like RAM; a write is a bus error (trap to 4). To
+put an assembled program in it: `rom.load(asm.bytes, asm.origin - rom.base)`.
+
 ## SimpleMachine
 
 `new SimpleMachine({ memory?, clockCycles = 1000, ...CpuOptions })`: a `DeviceMachine`
 with a `DL11` console (`console`) and a `KW11L` clock (`clock`). Adds `type(ch)`,
 `output`, `input`, `onOutput` (all from the console) and `clockCycles`. `DEV` has the
 register addresses and vectors (`DEV.XBUF`, `DEV.VEC_CLOCK`, …). You can `add` more
-devices.
+devices. With `display: true` (or `DisplayOptions`) it also has a [`Display`](#display) in
+`display`: RAM then ends at the pixel memory (`memory` defaults to `120000`), and the clock
+ticks once a frame (`clockCycles` defaults to `frameCycles`).
+
+## Display
+
+A framebuffer made for teaching (DEC never made one; it is listed below as a departure). The full
+design, with example routines (`VSYNC`, `FLIP`, `PLOT1`), is
+[`BLUE11_DISPLAY.md`](https://github.com/bluedragon-ctrl/Blue11/blob/main/docs/BLUE11_DISPLAY.md).
+
+- **Pixel memory** is 16 KB of ordinary RAM-like memory at `120000`–`157777`. **Mode 0**: 64 × 64,
+  a byte per pixel, (x, y) at `page + y*100 + x`, four pages `10000` apart; only the low 4 bits
+  pick the colour. **Mode 1**: 128 × 128, two pixels per byte (even x in bits 3–0), (x, y) at
+  `page + y*100 + x/2`, two pages `20000` apart.
+- **Registers** at `176600`: `DSPCS` (bits 1–0 `PAGE`, bit 2 `MODE`, bit 6 `IE`, bit 7 `DONE`;
+  `PAGE` and `MODE` take effect at the next vertical blank; `DONE` is cleared by writing it as 0),
+  `DSPFRM` (frame counter), `DSPLIN` (the beam's row, or `177777` in the blank), and 16 palette
+  words at `176620` (RGB 3-3-3: `700` is red). `176606`–`176616` is a hole (bus error).
+- **Time:** a vertical blank every `frameCycles` (20000) cycles. At the blank the frame is
+  latched, `DSPFRM` counts, `DONE` is set, and with `IE` it interrupts at vector `320`, level 4.
+- **Beam:** `'instant'` (default) latches the whole page at the blank, so nothing tears.
+  `'scan'` latches each row when the beam has passed it, so drawing on the shown page tears and
+  palette changes can race the beam. The beam passes row r from cycle
+  `blankCycles + floor(r * (frameCycles - blankCycles) / H)` of the frame (`blankCycles`
+  defaults to `frameCycles / 8`).
+
+```ts
+const m = new SimpleMachine({ display: true });     // RAM to 117777, display at 120000 / 176600
+m.boot(must(assemble(`
+        MOVB #4, @#120000   ; a red pixel at (0, 0)
+        MOV  #1403, @#123412 ; two cyan pixels at (12, 34) and (13, 34)
+1$:     TSTB @#176600       ; DSPCS: DONE comes at the vertical blank
+        BPL  1$
+        HALT
+`)));
+m.run(100_000);                                     // halts just after the first blank
+const f = m.display!.frame;                         // { width: 64, height: 64, pixels, palette, number: 1 }
+const rgba = frameToRgba(f);                        // RGBA bytes, row by row, for a canvas ImageData
+```
+
+| Member | |
+| :--- | :--- |
+| `new Display({ memory?, base?, vector?, level?, frameCycles?, blankCycles?, beam? })` | defaults `120000`, `176600`, `320`, 4, 20000, `frameCycles / 8`, `'instant'`. Throws on a bad option (`memory` must be a multiple of `20000`) |
+| `memory`, `control` | the two `Device`s (pixel memory and registers): `add` both to a `DeviceMachine` |
+| `frame: Frame` | the last latched frame: `width`, `height` (64 or 128), `pixels` (`Uint8Array`, colour indexes, row by row), `palette` (`Uint16Array`, 16 entries per row: row y's at `16 * y`, all rows alike with the instant beam), `number` (`DSPFRM`). A new object at every blank |
+| `onFrame(frame)` | called at every blank |
+| `bytes`, `palette` | pixel memory and the palette now (read them freely; no side effects) |
+| `line` | what `DSPLIN` reads |
+| `state()`, `load(state)` | the device as plain data (it survives `JSON.stringify`) |
+
+Also: `DSP` (the default addresses: `DSP.SCREEN`, `DSP.DSPCS`, `DSP.DSPFRM`, `DSP.DSPLIN`,
+`DSP.DSPPAL`, `DSP.VEC`), `DEFAULT_PALETTE` (the 16 power-up colours), `rgb333to888(v)`
+(`[r, g, b]`, 0–255) and `frameToRgba(frame, out?)`. A host runs the machine a frame at a time
+(`m.run(frameCycles)` per animation frame) and paints `display.frame`; a speed control changes
+how many frames it runs per second, never `frameCycles`, so programs behave the same at every
+speed. `RESET` clears only `IE`; `boot` clears the memory and restores the palette.
 
 ## Host recipes
 

@@ -367,3 +367,47 @@ export class KW11L implements Device {
   wakeIn(): number { return this.lks & CSR.IE ? this.untilTick : Infinity; }
   canWake(): boolean { return (this.lks & CSR.IE) !== 0; }
 }
+
+// -------------------------------------------------------------------- general devices
+
+export interface RomOptions {
+  /** First bus address (even). */
+  base: number;
+  /** Size in bytes (even, more than 0). */
+  size: number;
+}
+
+/**
+ * Read-only memory whose contents the host loads (a BIOS, a font). Reads answer like RAM,
+ * to bytes and words; a write from the program is a bus error (trap to 4).
+ */
+export class Rom implements Device {
+  readonly base: number;
+  readonly size: number;
+  /** The contents. The host may change them directly; the program can't. */
+  readonly bytes: Uint8Array;
+
+  constructor(opts: RomOptions) {
+    const { base, size } = opts;
+    if (!Number.isInteger(base) || !Number.isInteger(size) || base & 1 || size & 1 || size <= 0 || base < 0 || base + size > 0x10000) {
+      throw new Error(`Rom: base ${base.toString(8)} and size ${size.toString(8)} must be even, size > 0, inside 000000–177777`);
+    }
+    this.base = base;
+    this.size = size;
+    this.bytes = new Uint8Array(size);
+  }
+
+  /** Copy an image in at `offset` bytes from `base`. Throws if it doesn't fit. */
+  load(bytes: ArrayLike<number>, offset = 0): void {
+    if (!Number.isInteger(offset) || offset < 0 || offset + bytes.length > this.size) {
+      throw new Error(`Rom: ${bytes.length} bytes at offset ${offset.toString(8)} don't fit in ${this.size.toString(8)}`);
+    }
+    this.bytes.set(bytes, offset);
+  }
+
+  read(offset: number): number {
+    return this.bytes[offset] | (this.bytes[offset + 1] << 8);
+  }
+
+  write(): boolean { return false; }
+}
