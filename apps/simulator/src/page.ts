@@ -1,11 +1,11 @@
 /**
  * The simulator page: the editor, Run / Continue / Pause / Step, the screen on a canvas
- * with the keyboard, the console, the registers, disassembly, memory, stack, the listing,
+ * with the keyboard, the speaker, the console, the registers, disassembly, memory, stack, the listing,
  * the ROM, the examples and saved programs, sharing by URL, the input log, and the help.
  *
  * The machine runs whole frames paced by animation frames. The speed setting (frames per
- * second of wall time) is the only use of wall-clock time, and it never reaches the
- * simulation (src/sim.ts), whose time is cycles.
+ * second of wall time) is the only use of wall-clock time, with the speaker's scheduling
+ * (src/speaker.ts), and it never reaches the simulation (src/sim.ts), whose time is cycles.
  */
 
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands';
@@ -15,12 +15,14 @@ import { frameToRgba, keyCode, octal, type AsmError, type Frame } from 'blue11';
 import { blue11Asm, blue11Highlight } from 'blue11/codemirror';
 import { addressNamer, disassemblyAround, inRom, lineHeat, memoryRows, parseAddress, registerText, stackRows } from './debug';
 import { breakpointLines, debugExtensions, setErrors, setHeat, setPcLine, toggleBreakpointAtCursor } from './editor';
+import { CYCLES_PER_SECOND, lastHalfPeriod, shouldPlay } from './audio';
 import { HELP, inComment, wordAt } from './help';
 import { helpTooltip } from './help/tooltip';
 import { HelpView } from './help/view';
 import { FIRST, PROGRAMS, type Program } from './programs';
 import { romAssembly } from './rom';
 import { parseRecording, record, Simulator, type InputEvent, type StepResult } from './sim';
+import { Speaker } from './speaker';
 import { Library, shareHash, sharedProgram } from './storage';
 import { describeTrap } from './traps';
 
@@ -59,6 +61,9 @@ export function startPage(): void {
   const beam = $<HTMLInputElement>('beam');
   const eis = $<HTMLInputElement>('eis');
   const retro = $<HTMLInputElement>('retro');
+  const soundOn = $<HTMLInputElement>('sound');
+  const volume = $<HTMLInputElement>('volume');
+  const speaker = new Speaker();
   const crt = $('crt');
   const beamRow = $('beam-row');
   const buttons = {
@@ -233,7 +238,7 @@ export function startPage(): void {
   const speedText = $('speed-text');
   const fps = () => SPEEDS[Number(speed.value)] ?? 60;
   function showSpeed(): void {
-    speedText.textContent = `${fps()} frames/s${fps() === 60 ? ' (real time)' : ''}`;
+    speedText.textContent = `${fps()} frames/s${fps() === 60 ? ' (real time)' : soundOn.checked ? ' (sound: real time only)' : ''}`;
     try { browserStorage()?.setItem('blue11.sim.speed', speed.value); } catch { /* off */ }
   }
   speed.addEventListener('input', showSpeed);
@@ -248,6 +253,12 @@ export function startPage(): void {
       afterRebuild();
     }
   }
+  soundOn.checked = library.sound;
+  volume.value = String(library.volume);
+  const applySound = () => { speaker.mute = !soundOn.checked; speaker.volume = (Number(volume.value) / 100) ** 2; showSpeed(); };
+  applySound();
+  soundOn.addEventListener('change', () => { library.sound = soundOn.checked; applySound(); });
+  volume.addEventListener('input', () => { library.volume = Number(volume.value); applySound(); });
   const setRetro = (on: boolean) => { retro.checked = on; document.body.classList.toggle('retro', on); };
   setRetro(library.retro);
   retro.addEventListener('change', () => { library.retro = retro.checked; setRetro(retro.checked); });
@@ -339,6 +350,7 @@ export function startPage(): void {
 
   function go(resume: boolean): void {
     if (!sim.canRun) return;
+    speaker.start(); // from a click: browsers allow audio only then
     running = true;
     resumeNext = resume;
     owed = 1;
@@ -380,6 +392,8 @@ export function startPage(): void {
       owed -= 1;
       const r = sim.runFrame(resumeNext);
       resumeNext = false;
+      const chunk = sim.takeSound();
+      if (shouldPlay(true, fps())) speaker.play(chunk); else speaker.skip(chunk);
       if (r.stop !== 'frame') stopped(r);
       if (performance.now() > until) { owed = 0; break; }
     }
@@ -477,18 +491,18 @@ export function startPage(): void {
 
   // ---------------------------------------------------------------- views
 
-  type View = 'screen' | 'listing' | 'rom';
+  type View = 'screen' | 'listing' | 'rom' | 'sound';
   let view: View = 'screen';
   function setView(v: View): void {
     view = v;
-    for (const k of ['screen', 'listing', 'rom'] as const) {
+    for (const k of ['screen', 'listing', 'rom', 'sound'] as const) {
       $(`view-${k}`).hidden = k !== v;
       $(`tab-${k}`).classList.toggle('active', k === v);
       $(`tab-${k}`).setAttribute('aria-selected', String(k === v));
     }
     show();
   }
-  for (const k of ['screen', 'listing', 'rom'] as const) $(`tab-${k}`).addEventListener('click', () => setView(k));
+  for (const k of ['screen', 'listing', 'rom', 'sound'] as const) $(`tab-${k}`).addEventListener('click', () => setView(k));
 
   /** The listings: rebuilt for a new program, then only the PC's row changes. */
   const listings = {
@@ -526,6 +540,57 @@ export function startPage(): void {
     const img = ctx.createImageData(f.width, f.height);
     frameToRgba(f, img.data);
     ctx.putImageData(img, 0, 0);
+  }
+
+  const wave = $<HTMLCanvasElement>('wave');
+  const waveCtx = wave.getContext('2d')!;
+  /** The speaker's last frame against a ruler in cycles. */
+  function drawWave(): void {
+    const t = sim.history.get();
+    const W = wave.width;
+    const H = wave.height;
+    const len = sim.history.length;
+    const start = t.to - len;
+    const x = (c: number) => ((c - start) / len) * W;
+    const hi = 30;
+    const lo = H - 60;
+    waveCtx.fillStyle = '#000';
+    waveCtx.fillRect(0, 0, W, H);
+    // the ruler: a tick every 1000 cycles, a number every 5000
+    waveCtx.strokeStyle = '#ffffff40';
+    waveCtx.fillStyle = '#ffffffa0';
+    waveCtx.font = '20px ui-monospace, monospace';
+    waveCtx.beginPath();
+    for (let c = 0; c <= len; c += 1000) {
+      const px = (c / len) * W;
+      waveCtx.moveTo(px, H - 40);
+      waveCtx.lineTo(px, H - (c % 5000 ? 32 : 24));
+      if (c % 5000 === 0 && c < len) waveCtx.fillText(String(c), px + 4, H - 6);
+    }
+    waveCtx.stroke();
+    // the speaker
+    waveCtx.strokeStyle = '#39d0ff';
+    waveCtx.lineWidth = 2;
+    waveCtx.beginPath();
+    let level = t.level;
+    let px = x(Math.max(t.from, start));
+    waveCtx.moveTo(px, level ? hi : lo);
+    for (const e of t.edges) {
+      px = x(e.cycle);
+      waveCtx.lineTo(px, level ? hi : lo);
+      level = e.level;
+      waveCtx.lineTo(px, level ? hi : lo);
+    }
+    waveCtx.lineTo(x(t.to), level ? hi : lo);
+    waveCtx.stroke();
+    waveCtx.lineWidth = 1;
+    const half = lastHalfPeriod(t, CYCLES_PER_SECOND);
+    const read = (a: number) => sim.machine.read(a, false);
+    $('wave-info').textContent = [
+      `${t.edges.length} edge${t.edges.length === 1 ? '' : 's'} in the last frame`,
+      half ? `last half period ${half.cycles} cycles (${half.hz < 1000 ? half.hz.toFixed(1) : Math.round(half.hz)} Hz)` : 'no tone',
+      `SNDCS ${octal(read(0o176740), 1)}`, `SNDDIV ${octal(read(0o176742))}`,
+    ].map((s) => s.replace(/ /g, '\u00a0')).join('   ');
   }
 
   function showInputs(): void {
@@ -602,7 +667,11 @@ export function startPage(): void {
       `mode ${f.width === 128 ? 1 : 0} (${f.width} × ${f.height})`, `frame ${octal(f.number)}`, `cycle ${sim.machine.cycles}`,
       sim.beam === 'scan' ? 'real beam' : 'instant beam', `beam ${row === 0o177777 ? 'in blank' : `row ${octal(row, 3)}`}`,
     ].map((t) => t.replace(/ /g, '\u00a0')).join('   ');
-    if (view !== 'screen') showListing(view);
+    if (view === 'listing' || view === 'rom') showListing(view);
+    // Time that was not played (a step, a pause, another speed) goes into the waveform only.
+    speaker.skip(sim.takeSound());
+    if (sim.bells) { speaker.bell(); sim.bells = 0; }
+    if (view === 'sound') drawWave();
     showInputs();
   }
 

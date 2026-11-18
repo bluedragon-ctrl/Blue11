@@ -43,6 +43,9 @@ export const SYMBOL_HELP: Readonly<Record<string, string>> = {
   'K.ESC': 'Key code of Esc.',
   'K.SPC': 'Key code of Space.',
   'K.DEL': 'Key code of Delete.',
+  // Sound
+  SNDCS: 'The speaker: bit 0, 1 out and 0 in (the other bits read 0). Switch it with `XOR`: the pitch comes from the cycles between two switches.',
+  SNDDIV: 'The tone generator: a half period in cycles. Not 0, it switches the speaker by itself every `SNDDIV` cycles (1364. is an A); 0 stops it.',
   // ROM
   DRAWCH: 'Draw a character in mode 0: R0 = the character, R1 = the address of the cell\'s top-left pixel, R2 = the colour. R1 moves to the next cell.',
   DRAWC1: 'Draw a character in mode 1: R0 = the character, R1 = the byte of the cell\'s top-left pixel, R2 = the colour. R1 moves to the next cell.',

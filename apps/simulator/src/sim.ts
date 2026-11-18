@@ -1,6 +1,6 @@
 /**
  * The simulated computer and the commands on it, without the DOM (so it is tested): a
- * SimpleMachine with the display, the keyboard and the ROM; load, run a frame, step,
+ * SimpleMachine with the display, the keyboard, the sound device and the ROM; load, run a frame, step,
  * breakpoints; live input with a log, and replaying that log exactly.
  *
  * Time is CPU cycles. The page decides how many frames to run per second of wall time;
@@ -8,8 +8,9 @@
  */
 
 import {
-  assemble, DSP, octal, SimpleMachine, type AsmError, type AssembleResult, type Beam, type Frame, type Key, type StopReason, type TrapInfo,
+  assemble, DSP, octal, SimpleMachine, type AsmError, type AssembleResult, type Beam, type Frame, type Key, type SoundChunk, type StopReason, type TrapInfo,
 } from 'blue11';
+import { History } from './audio';
 import { makeRom, programSymbols } from './rom';
 
 /** One input of a run, at the cycle it happened. */
@@ -90,6 +91,10 @@ export class Simulator {
   last: Stop | 'step' | null = null;
   /** The trap the CPU stopped on (a vector with no handler). */
   trap: TrapInfo | null = null;
+  /** The speaker's last frame of edges, for the waveform view (one frame of cycles). */
+  readonly history = new History(20000);
+  /** BEL characters (7) the program printed and the page has not rung yet. */
+  bells = 0;
 
   /** Characters typed on the console in this run (the keyboard keeps its own log). */
   private typed: Array<{ cycle: number; ch: number }> = [];
@@ -103,8 +108,9 @@ export class Simulator {
   }
 
   private build(): void {
-    const m = new SimpleMachine({ display: { beam: this.beam }, keyboard: true, eis: this.eis });
+    const m = new SimpleMachine({ display: { beam: this.beam }, keyboard: true, sound: true, eis: this.eis });
     m.add(makeRom());
+    m.onOutput = (ch) => { if (ch === '\x07') this.bells++; };
     // A trap through an empty vector stops instead of jumping to 0 and running the vectors.
     m.cpu.onTrap = (t) => (m.read(t.vector, false) === 0 ? 'stop' : 'vector');
     m.cpu.onInstruction = (pc) => { this.heat[pc >> 1]++; };
@@ -145,6 +151,7 @@ export class Simulator {
     return { width: H, height: H, number: d.frame.number, pixels, palette };
   }
   get keyboard() { return this.machine.keyboard!; }
+  get sound() { return this.machine.sound!; }
   get cpu() { return this.machine.cpu; }
   /** Cycles per frame (20000). */
   get frameCycles(): number { return this.display.frameCycles; }
@@ -188,6 +195,18 @@ export class Simulator {
     this.pending = [];
     this.last = null;
     this.trap = null;
+    this.bells = 0;
+    this.history.clear();
+  }
+
+  /**
+   * The speaker since the last call (docs/BLUE11_SOUND.md §7): the page calls it after every
+   * command and plays it, and the waveform view keeps it.
+   */
+  takeSound(): SoundChunk {
+    const c = this.sound.take();
+    this.history.push(c);
+    return c;
   }
 
   /** Every input of this run so far, in order. */

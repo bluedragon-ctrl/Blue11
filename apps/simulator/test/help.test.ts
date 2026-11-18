@@ -86,7 +86,8 @@ describe('help coverage', () => {
     const { PROGRAMS } = await import('../src/programs');
     const all = blocks().flatMap(({ block }) => blockTexts(block)).join(' ');
     const named = ['Addressing modes tour', 'TRAP as a system call', 'Line clock', 'Echo', 'Counting Space',
-      'Circle (mode 1, PLOT1)', 'Bouncing pixel', 'Sky gradient', 'Hello', 'Font viewer', 'My own DRAWCH'];
+      'Circle (mode 1, PLOT1)', 'Bouncing pixel', 'Sky gradient', 'Hello', 'Font viewer', 'My own DRAWCH',
+      'A beeper note', 'A scale', 'A tune', 'Play and draw'];
     for (const name of named) {
       expect(all.includes(`**${name}**`), name).toBe(true);
       expect(PROGRAMS.some((p) => p.name.startsWith(name)), `example “${name}”`).toBe(true);

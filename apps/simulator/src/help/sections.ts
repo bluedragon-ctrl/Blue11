@@ -9,7 +9,7 @@
  * top, the reason before the rule, and every new word explained (or in the glossary).
  */
 
-import { DEFAULT_PALETTE, DEV, DSP, KBD, octal, PSW_ADDRESS, VEC } from 'blue11';
+import { DEFAULT_PALETTE, DEV, DSP, KBD, octal, PSW_ADDRESS, SND, VEC } from 'blue11';
 import { ROM_BASE, ROM_SIZE, romAssembly } from '../rom';
 import { OP_GROUPS, opEntry } from './instructions';
 import { code, dec, entries, h, list, note, p, table, type Block, type Entry, type Section } from './model';
@@ -600,6 +600,7 @@ const memory: Section = {
       [`${o(ROM_BASE)}–${o(ROM_BASE + ROM_SIZE - 1)}`, 'the [ROM](rom): the font and the routines that draw it. Read it freely; writing is a bus error.'],
       [`${o(DSP.DSPCS)}–176657`, 'the display\'s [registers](display-frames)'],
       [`${o(KBD.KBDCS)}–176703`, 'the [keyboard](keyboard-events)\'s registers'],
+      [`${o(SND.SNDCS)}–176743`, 'the [speaker](sound)\'s registers'],
       [`${o(KBD.KBDKEY)}–177177`, 'the keyboard\'s [key map](keyboard): a byte per key'],
       [o(DEV.LKS), 'the [line clock](clock)'],
       [`${o(DEV.RCSR)}–177567`, 'the [console](console)'],
@@ -948,6 +949,66 @@ const keyboardEvents: Section = {
   ],
 };
 
+/** Half periods (1200000 / 2f) of the C major scale from middle C, as in the examples. */
+const NOTES: Array<[string, number, number]> = [
+  ['C (middle C)', 261.6, 2293], ['D', 293.7, 2043], ['E', 329.6, 1820], ['F', 349.2, 1718],
+  ['G', 392.0, 1531], ['A', 440.0, 1364], ['B', 493.9, 1215], ['C', 523.3, 1147],
+];
+
+const sound: Section = {
+  id: 'sound', title: 'Sound: the speaker', group: DEVICES,
+  blocks: [
+    p('The speaker is **one bit**: it is either out or in. To make a note, the program moves it out and in again, over and over. '
+      + 'How many cycles pass between two moves sets the pitch, so here the [cycles](cycles) of your loop are something you hear.'),
+    p(`The machine runs ${dec(60 * FRAME)} cycles a second, so a note of f Hz moves the speaker every ${dec(60 * FRAME)} / (2 × f) cycles: its **half period**.`),
+    table(['Note', 'Hz', 'Half period (cycles)'], NOTES.map(([n, hz, half]) => [n, hz.toFixed(1), `\`${dec(half)}\` (${o(half, 1)})`])),
+    h('The beeper: switching it yourself'),
+    code(`
+      ; An A (440 Hz) for one second. One pass: 3 + 2 + 1358. + 1 = 1364. cycles.
+              MOV  #SNDCS, R2     ; the register, in a register: cheaper to reach
+              MOV  #1, R1         ; the bit to switch
+              MOV  #880., R3      ; 880. half periods: one second
+      TONE:   XOR  R1, (R2)       ; 3 cycles: switch the speaker
+              MOV  #1358., R0     ; 2 cycles
+      1$:     SOB  R0, 1$         ; 1 cycle, 1358. times
+              SOB  R3, TONE       ; 1 cycle
+              HALT
+    `),
+    list(
+      'Only bit 0 of `SNDCS` is kept, so `XOR`, `INC` and `COM` all switch it, and `BIS #1` / `BIC #1` set it.',
+      'The speaker moves at the cycle of the write, exactly. Put the counter in memory instead of R0 and every pass costs more: the note goes flat.',
+      'While the CPU counts, it can do nothing else: draw in the loop and the note changes. That is the job of the tone generator.',
+    ),
+    h('The tone generator'),
+    p('Write a half period to `SNDDIV` and the speaker switches by itself, every `SNDDIV` cycles, while the program does something else. Write 0 to stop it.'),
+    code(`
+      ; An A for one second (60 line-clock ticks), while the CPU is free.
+              MOV  #1364., @#SNDDIV   ; the generator plays an A
+              MOV  #60., R0
+      1$:     CLR  @#LKS              ; clear DONE
+      2$:     TSTB @#LKS              ; wait for the next tick
+              BPL  2$
+              SOB  R0, 1$
+              CLR  @#SNDDIV           ; silence
+              HALT
+    `),
+    list(
+      'A new `SNDDIV` takes effect at the next switch, so a tune changes notes without a click.',
+      'While the generator runs, bit 0 of `SNDCS` is ignored. There is no interrupt: change the note from the [line clock](clock) or the vertical blank.',
+      '`RESET` silences the speaker.',
+    ),
+    h('Registers'),
+    entries(...symbolEntries('SNDCS', 'SNDDIV')),
+    h('In the simulator'),
+    list(
+      'Turn **Sound** on in the settings. It plays only at **60 frames/s**, real time: at any other speed, while paused and while stepping it is silent, because the pitch would be wrong.',
+      'The **Sound** tab draws the speaker over the last frame against a ruler in cycles, and the last half period it measured: you can see a note without hearing it.',
+      'A program that prints character 7 (BEL) on the [console](console) rings the bell.',
+      'In the Examples menu, under Sound: the **A beeper note**, **A scale**, **A tune** and **Play and draw** examples.',
+    ),
+  ],
+};
+
 /** The ROM's numbers, from its assembly. */
 const romSym = (n: string) => romAssembly().symbols.get(n)!;
 
@@ -1049,7 +1110,7 @@ const SECTIONS_NO_INDEX: Section[] = [
   bigPicture, registers, memory, addressing, modes, stack,
   instructions, ...instructionPages,
   cycles, traps, interrupts,
-  consoleSection, clock, display, displayFrames, palette, keyboard, keyboardEvents, rom,
+  consoleSection, clock, display, displayFrames, palette, keyboard, keyboardEvents, sound, rom,
 ];
 
 /** Every predefined name with its value and where it is described. */
