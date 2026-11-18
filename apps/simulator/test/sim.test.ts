@@ -19,7 +19,12 @@ describe('Simulator', () => {
 
   it('refuses a program that runs into the display memory', () => {
     const s = new Simulator();
-    expect(s.load(' .=117776\n .WORD 1, 2')[0].message).toMatch(/past the end of RAM/);
+    const errors = s.load(' HALT\n .=117776\n .WORD 1, 2\n .WORD 3');
+    expect(errors).toEqual([
+      { line: 3, column: 0, message: "120000–120001 is past the end of RAM (117777), in the display's memory or above: it can't be loaded" },
+      { line: 4, column: 0, message: "120002–120003 is past the end of RAM (117777), in the display's memory or above: it can't be loaded" },
+    ]);
+    expect(s.program).toBeNull();
   });
 
   it('runs whole frames of 20000 cycles', () => {

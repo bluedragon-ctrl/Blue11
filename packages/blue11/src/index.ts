@@ -17,7 +17,7 @@ export type { Disassembled, DisassembleOptions } from './disassembler.js';
 export { INSTRUCTIONS, BY_NAME, decodeOp, octal, REGISTER_NAMES, REGISTERS } from './isa.js';
 export type { Format, OpInfo } from './isa.js';
 export { DeviceMachine, DL11, KW11L, Rom } from './devices.js';
-export type { Device, DeviceMachineOptions, DL11Options, RomOptions } from './devices.js';
+export type { BootResult, Device, DeviceMachineOptions, DL11Options, NotLoaded, RomOptions } from './devices.js';
 export { Display, DSP, DEFAULT_PALETTE, rgb333to888, frameToRgba } from './display.js';
 export type { Beam, DisplayOptions, DisplayState, Frame } from './display.js';
 export { Keyboard, KBD, KEY, keyCode } from './keyboard.js';

@@ -8,7 +8,7 @@
  */
 
 import {
-  assemble, SimpleMachine, type AsmError, type AssembleResult, type Beam, type Key, type StopReason, type TrapInfo,
+  assemble, octal, SimpleMachine, type AsmError, type AssembleResult, type Beam, type Key, type StopReason, type TrapInfo,
 } from 'blue11';
 import { makeRom, programSymbols } from './rom';
 
@@ -132,8 +132,14 @@ export class Simulator {
   load(source: string): AsmError[] {
     const asm = assemble(source, { symbols: programSymbols() });
     if (!asm.ok) return asm.errors;
-    if (asm.origin + asm.bytes.length > RAM_END) {
-      return [{ line: 0, column: 0, message: `the program runs past the end of RAM (${RAM_END.toString(8)}), into the display's memory` }];
+    // Everything past RAM would be left out: say so on each line, and load nothing.
+    const outside = this.machine.notLoaded(asm);
+    if (outside.length) {
+      return outside.map((n) => ({
+        line: n.line ?? 0,
+        column: 0,
+        message: `${octal(n.start)}–${octal(n.end - 1)} is past the end of RAM (${octal(RAM_END - 1)}), in the display's memory or above: it can't be loaded`,
+      }));
     }
     this.program = asm;
     this.source = source;

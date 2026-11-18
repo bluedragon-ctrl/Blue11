@@ -5,6 +5,20 @@ minor version may break the API, and a patch never does. The public API is every
 exported from `blue11` and `blue11/codemirror`, plus the JSON form of saved states
 (`cpu.save()`, `display.state()`, `keyboard.state()`).
 
+## 0.6.0 (2026-11-18)
+
+Loading honestly: a machine says which parts of a program it could not load.
+
+- `DeviceMachine.boot(asm)` returns a `BootResult`: `notLoaded` lists the parts of the program
+  outside RAM, which it leaves out (before, they were dropped without a word, as with
+  `. = 170000` then `.WORD 1`). Each is `{ start, end, line? }`, `end` exclusive.
+- `DeviceMachine.notLoaded(asm)` gives the same list without booting.
+- `Program` may carry `lines` (an `AssembleResult` does): each entry then names its source line.
+  Without them, one range from the end of RAM to the end of the program.
+- New types `BootResult` and `NotLoaded`. A host that ignored `boot`'s result is unaffected.
+- Simulator: a program past the end of RAM gets an error on each line that reaches past it,
+  instead of one error with no line.
+
 ## 0.5.0 (2026-11-18)
 
 Assembler expressions are 16-bit values, as in the original assembler. Some programs assemble
