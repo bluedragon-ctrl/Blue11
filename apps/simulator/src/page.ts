@@ -1,7 +1,7 @@
 /**
  * The simulator page: the editor, Run / Continue / Pause / Step, the screen on a canvas
  * with the keyboard, the console, the registers, disassembly, memory, stack, the listing,
- * the ROM, the examples and saved programs, sharing by URL, and the input log.
+ * the ROM, the examples and saved programs, sharing by URL, the input log, and the help.
  *
  * The machine runs whole frames paced by animation frames. The speed setting (frames per
  * second of wall time) is the only use of wall-clock time, and it never reaches the
@@ -15,6 +15,9 @@ import { frameToRgba, keyCode, octal, type AsmError, type Frame } from 'blue11';
 import { blue11Asm, blue11Highlight } from 'blue11/codemirror';
 import { addressNamer, disassemblyAround, inRom, lineHeat, memoryRows, parseAddress, registerText, stackRows } from './debug';
 import { breakpointLines, debugExtensions, setErrors, setHeat, setPcLine, toggleBreakpointAtCursor } from './editor';
+import { HELP, inComment, wordAt } from './help';
+import { helpTooltip } from './help/tooltip';
+import { HelpView } from './help/view';
 import { FIRST, PROGRAMS, type Program } from './programs';
 import { romAssembly } from './rom';
 import { parseRecording, record, Simulator, type InputEvent, type StepResult } from './sim';
@@ -84,6 +87,25 @@ export function startPage(): void {
   const romBreakpoints = new Set<number>();
   let shownFrame: Frame | null = null;
 
+  // ---------------------------------------------------------------- help
+
+  const helpDialog = $<HTMLDialogElement>('help');
+  const help = new HelpView(helpDialog, HELP);
+  /** F1 in the editor: help on the word under the cursor (the contents if none, or in a comment). */
+  const helpAtCursor = (view: EditorView): boolean => {
+    const pos = view.state.selection.main.head;
+    const line = view.state.doc.lineAt(pos);
+    const col = pos - line.from;
+    help.open(inComment(line.text, col) ? null : HELP.topicFor(wordAt(line.text, col)));
+    return true;
+  };
+  $('show-help').addEventListener('click', () => help.open());
+  window.addEventListener('keydown', (ev) => {
+    if (ev.key !== 'F1' || ev.defaultPrevented) return;
+    ev.preventDefault();
+    if (help.isOpen) helpDialog.close(); else help.open();
+  });
+
   // ---------------------------------------------------------------- editor
 
   const editor = new EditorView({
@@ -91,8 +113,9 @@ export function startPage(): void {
     state: EditorState.create({
       doc: '',
       extensions: [
-        debugExtensions, lineNumbers(), history(),
+        debugExtensions, lineNumbers(), history(), helpTooltip(HELP, (t) => help.open(t)),
         keymap.of([
+          { key: 'F1', run: helpAtCursor },
           { key: 'Mod-Enter', run: () => { run(); return true; } },
           { key: 'F9', run: toggleBreakpointAtCursor },
           { key: 'F10', run: () => { step(); return true; } },

@@ -39,8 +39,13 @@ README as a departure from the original machine.
    showcase programs; the examples, programs saved in `localStorage`, share links, and an input
    log with exact replays, saved to and opened from files. Every example runs in its tests as
    the page runs it, and they check the frames it draws.
-5. **Help in the simulator:** the instructions, addressing modes, devices and the ROM's
-   routines, searchable, with help on the word under the cursor (as HackCode has).
+5. ~~**Help in the simulator**~~ (done, 2026-11-18, `apps/simulator/src/help/`): HackCode's
+   help ported (the model, dialog and tooltips) with the simulator's own text: getting started,
+   the controls, the assembler, registers, addressing modes, every instruction, memory, cycles,
+   the stack, traps, interrupts, the console, line clock, display, keyboard and ROM, and an
+   index of the predefined names. A search, F1 on the word under the cursor, and hover
+   tooltips in the editor. Its tests check that every instruction and name is described once,
+   that links resolve, and that the examples assemble and run.
 6. **Later, if wanted:** a third display mode (such as 128 × 128 at 1 bpp), a mouse, more keys,
    and a shared UI package for the debugger panels HackCode and the simulator have in common
    (extracted only once both exist).

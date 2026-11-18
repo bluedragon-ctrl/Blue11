@@ -15,6 +15,7 @@
         <button id="save" class="secondary" title="Save the editor's program in this browser">Save</button>
         <button id="delete" class="secondary" title="Delete this saved program from the browser">Delete</button>
         <button id="share" class="secondary" title="Copy a link that opens this program">Share</button>
+        <button id="show-help" title="The instructions, addressing modes, devices and the ROM's routines, searchable (F1; in the editor, F1 on a word)">Help</button>
       </div>
     </header>
     <main>
@@ -93,6 +94,17 @@
         </div>
       </section>
     </main>
+    <dialog id="help" class="help">
+      <div class="toolbar">
+        <h2>Help</h2>
+        <input class="help-search" type="search" placeholder="Search: MOV, DSPCS, palette, stack…" spellcheck="false" aria-label="Search the help">
+        <button class="help-close secondary">Close</button>
+      </div>
+      <div class="help-body">
+        <nav class="help-nav"></nav>
+        <article class="help-content"></article>
+      </div>
+    </dialog>
     <script type="module" src="./src/main.ts"></script>
   </body>
 </html>
