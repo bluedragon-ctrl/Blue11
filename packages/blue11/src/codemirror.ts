@@ -4,7 +4,7 @@
  */
 import { HighlightStyle, StreamLanguage, syntaxHighlighting } from '@codemirror/language';
 import { tags as t } from '@lezer/highlight';
-import { BY_NAME, REGISTERS } from './isa';
+import { BY_NAME, REGISTERS } from './isa.js';
 
 /** Tokenizer: labels, mnemonics, directives, registers, numbers (octal / decimal), text. */
 export const blue11Asm = StreamLanguage.define<{ op: boolean; text: boolean }>({

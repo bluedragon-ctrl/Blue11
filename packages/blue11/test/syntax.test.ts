@@ -3,8 +3,8 @@
  * the warnings for likely mistakes are in syntax-warnings.test.ts.
  */
 import { describe, expect, it } from 'vitest';
-import { assemble } from '../../src/blue11';
-import { assembleOk } from '../helpers/asm';
+import { assemble } from '../src/index.js';
+import { assembleOk } from './helpers/asm';
 import { err, word, words } from './helpers';
 
 describe('assembler compatibility', () => {

@@ -1,14 +1,14 @@
 /**
  * A minimal system around the CPU: RAM, a DL11 console terminal and a KW11-L line
  * clock, at their real DEC addresses and vectors. Used by the tests and the example
- * programs (`src/simulator/examples.ts`); a project with its own peripherals builds on {@link DeviceMachine}
+ * programs (`examples/examples.ts`); a project with its own peripherals builds on {@link DeviceMachine}
  * (`devices.ts`) the same way.
  *
  * Time is cycles: the line clock ticks every `clockCycles` CPU cycles, so a run is
  * deterministic (no wall-clock time).
  */
 
-import { CSR, DEV, DeviceMachine, DL11, KW11L, type DeviceMachineOptions } from './devices';
+import { CSR, DEV, DeviceMachine, DL11, KW11L, type DeviceMachineOptions } from './devices.js';
 
 export { CSR, DEV };
 

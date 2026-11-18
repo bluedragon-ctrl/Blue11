@@ -1,0 +1,51 @@
+{
+  "name": "blue11",
+  "version": "0.1.0",
+  "description": "A PDP-11-style 16-bit CPU, assembler (a subset of MACRO-11), disassembler and memory-mapped devices, for teaching. Deterministic, no dependencies.",
+  "license": "MIT",
+  "type": "module",
+  "keywords": ["pdp-11", "cpu", "emulator", "assembler", "macro-11", "education", "octal"],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/bluedragon-ctrl/Blue11.git",
+    "directory": "packages/blue11"
+  },
+  "homepage": "https://github.com/bluedragon-ctrl/Blue11#readme",
+  "bugs": "https://github.com/bluedragon-ctrl/Blue11/issues",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./codemirror": {
+      "types": "./dist/codemirror.d.ts",
+      "default": "./dist/codemirror.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": ["dist", "src", "README.md", "LICENSE"],
+  "engines": { "node": ">=18" },
+  "scripts": {
+    "build": "rm -rf dist && tsc -p tsconfig.build.json",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "npm run build && npm test"
+  },
+  "peerDependencies": {
+    "@codemirror/language": "^6.0.0",
+    "@lezer/highlight": "^1.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@codemirror/language": { "optional": true },
+    "@lezer/highlight": { "optional": true }
+  },
+  "devDependencies": {
+    "@codemirror/language": "^6.13.1",
+    "@lezer/highlight": "^1.2.5",
+    "@types/node": "^22.20.5",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.8",
+    "vitest": "^5.1.0"
+  }
+}

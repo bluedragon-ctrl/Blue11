@@ -3,7 +3,7 @@
  * the warnings for things that assemble but are probably not meant.
  */
 import { describe, expect, it } from 'vitest';
-import { assemble } from '../../src/blue11';
+import { assemble } from '../src/index.js';
 import { errors, runAsm, warns, word, words } from './helpers';
 
 describe('blue11 assembler: implicit .WORD', () => {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { assemble, BUS_ERROR, DeviceMachine, DL11, KW11L, SimpleMachine, type Cpu, type Device } from '../../src/blue11';
-import { assembleOk } from '../helpers/asm';
+import { assemble, BUS_ERROR, DeviceMachine, DL11, KW11L, SimpleMachine, type Cpu, type Device } from '../src/index.js';
+import { assembleOk } from './helpers/asm';
 import { boot as bootSimple, o, runAsm, words } from './helpers';
 
 /** A test peripheral: a counter register and a timer that interrupts after `delay` cycles. */

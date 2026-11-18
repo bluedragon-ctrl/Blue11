@@ -1,7 +1,7 @@
 # Blue-11 display: a memory-mapped graphics device (spec, not built)
 
 Status: **decided, not built** (2026-11-18). This device is part of the Blue-11
-library, not of HackCode, and moves with the library to its own repository (ROADMAP.md §1).
+library, not of HackCode ([ROADMAP.md](ROADMAP.md)).
 Its first user is the standalone simulator for students. HackCode may add it later but does
 not need it.
 
@@ -14,7 +14,7 @@ not need it.
   with routines that draw characters, as readable source that students can study and copy (§11).
 
 The companion devices are already built: the DL11 console and the KW11-L line clock
-(`src/blue11/devices.ts`). The keyboard is specified in [`BLUE11_KEYBOARD.md`](BLUE11_KEYBOARD.md).
+(`packages/blue11/src/devices.ts`). The keyboard is specified in [`BLUE11_KEYBOARD.md`](BLUE11_KEYBOARD.md).
 
 ## 1. Goals
 
@@ -26,7 +26,7 @@ The companion devices are already built: the DL11 console and the KW11-L line cl
   writes, little-endian order, waiting for vertical blank, double buffering, palettes, and
   what filling a screen costs in cycles.
 - **Small:** two modes that follow the same rules, so the whole device fits on one help page.
-- **It follows the library's rules** (`src/blue11/AGENTS.md`): deterministic, integers only, no
+- **It follows the library's rules** (`packages/blue11/AGENTS.md`): deterministic, integers only, no
   DOM, and its state survives JSON. The library keeps only the pixels. The host draws them.
 
 **Not goals:** sprites, hardware scrolling, line drawing, a hardware text mode, or blitting. A
@@ -341,7 +341,7 @@ All answered by the owner on 2026-11-18:
 
 ## 10. Tests (written first)
 
-`tests/blue11/display.test.ts`:
+`packages/blue11/test/display.test.ts`:
 
 - **Addresses.** Mode 0: (x, y) is at `page + y*100 + x`, pages are `10000` apart, and the high 4
   bits are kept in memory but masked in the frame. Mode 1: (x, y) is at `page + y*100 + x/2`,
@@ -367,12 +367,12 @@ All answered by the owner on 2026-11-18:
 - **Reset.** Power-up and `RESET` behave as in §7.
 - **State.** `state()` → `JSON.stringify` → `load()` gives the same run. Two runs of the same
   program give the same frames.
-- **Example programs** (`src/simulator/examples.ts`), checked by their latched frame instead of
+- **Example programs** (`packages/blue11/examples/examples.ts`), checked by their latched frame instead of
   console text: a diagonal and a filled rectangle in mode 0, a bouncing pixel with double
   buffering, `PLOT1` drawing a circle in mode 1, palette cycling, and a sky gradient by racing
   the beam (scanning beam).
 - **README.** `readme-examples.test.ts` runs the code blocks in the README's display section.
-- **`Rom`** (`tests/blue11/devices.test.ts`): reads what was loaded, a write is a bus error
+- **`Rom`** (`packages/blue11/test/devices.test.ts`): reads what was loaded, a write is a bus error
   (trap 4), and a load that doesn't fit throws.
 - **The simulator's ROM** (in the simulator's tests): it assembles without errors or warnings,
   and its jump table and `FONT` are at the addresses in §11. `DRAWCH` and `DRAWC1` draw `A`
@@ -389,7 +389,7 @@ routines, and then copy them into their own programs and change them.
 
 - **What goes where.** The library gets a general **`Rom` device**: read-only memory whose
   contents the host loads, where writes are bus errors (trap 4). This is HackCode's
-  `Rom` (`src/core/robot.ts`) made general, with its base and size as options, and HackCode then
+  `Rom` (its `src/core/robot.ts`) made general, with its base and size as options, and HackCode then
   uses it. The ROM's *contents* (the font and the routines) belong to the simulator, not the
   library (library rule 5): its source is `apps/simulator/rom.mac`, assembled when the page
   loads.

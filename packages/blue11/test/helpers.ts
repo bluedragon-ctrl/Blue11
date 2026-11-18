@@ -1,5 +1,5 @@
-import { assemble, SimpleMachine, type AssembleOptions, type AssembleResult, type MachineOptions } from '../../src/blue11';
-import { assembleOk } from '../helpers/asm';
+import { assemble, SimpleMachine, type AssembleOptions, type AssembleResult, type MachineOptions } from '../src/index.js';
+import { assembleOk } from './helpers/asm';
 
 /** Assemble at 001000 and boot a SimpleMachine with it (not run yet). */
 export function boot(src: string, opts: MachineOptions & { asm?: AssembleOptions } = {}) {

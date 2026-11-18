@@ -6,7 +6,7 @@
  * of the public methods. Time is counted in cycles; the host chooses the cycle model.
  */
 
-import { branchOffset } from './isa';
+import { branchOffset } from './isa.js';
 
 /** What a bus returns for an address with nothing there (or a write it refuses). */
 export const BUS_ERROR = -1;

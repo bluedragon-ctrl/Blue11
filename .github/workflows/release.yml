@@ -1,0 +1,33 @@
+name: Release to npm
+
+# Push a tag vX.Y.Z whose version equals packages/blue11/package.json to publish it.
+# Needs the repository secret NPM_TOKEN (an npm automation or granular token).
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+  id-token: write # npm provenance
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          registry-url: https://registry.npmjs.org
+      - run: npm ci
+      - name: The tag matches the package version
+        run: |
+          v=$(node -p "require('./packages/blue11/package.json').version")
+          test "v$v" = "$GITHUB_REF_NAME" || { echo "tag $GITHUB_REF_NAME, package $v"; exit 1; }
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm publish --workspace packages/blue11 --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

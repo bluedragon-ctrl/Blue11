@@ -1,20 +1,20 @@
 # Blue-11: the machine (design and rationale)
 
 This is the design of the Blue-11 library: what the machine is, why it is built this way, and
-how it departs from the original. It moves with the library to its own repository
-(ROADMAP.md §1). The API reference is the library's
-[`README.md`](../src/blue11/README.md), and its working rules are in
-[`AGENTS.md`](../src/blue11/AGENTS.md).
+how it departs from the original. The API reference is the library's
+[`README.md`](../packages/blue11/README.md), and its working rules are in
+[`AGENTS.md`](../packages/blue11/AGENTS.md). What comes next: [`ROADMAP.md`](ROADMAP.md).
 
 This document was split from `BLUE11_CPU.md` on 2026-11-18. That document was written for the
-earlier Rover project and stays in HackCode as history. Its library sections now point here.
+earlier Rover project and stays in [HackCode](https://github.com/bluedragon-ctrl/HackCode) as
+history. Its library sections now point here.
 
 | Document | What |
 | :--- | :--- |
 | this one | the CPU, the assembler, cycles, flags, traps and interrupts, the library's rules |
 | [`BLUE11_DISPLAY.md`](BLUE11_DISPLAY.md) | the display: 64 × 64 and 128 × 128 pixels, a palette, vertical blank, an optional scanning beam, and the simulator's font ROM |
 | [`BLUE11_KEYBOARD.md`](BLUE11_KEYBOARD.md) | the keyboard: key codes, a key map, an event queue, replays |
-| [`README.md`](../src/blue11/README.md) | the API reference, recipes and pitfalls; its examples are run by the tests |
+| [`README.md`](../packages/blue11/README.md) | the API reference, recipes and pitfalls; its examples are run by the tests |
 
 ## 1. Principle
 
@@ -281,7 +281,7 @@ down reads `200`, and a release event is a negative byte.
 
 The base CPU is the **original /40 model's instruction set without its EIS option**, so it has no
 `MUL` or `DIV`. The early /20 model had none either: programs called routines like these. They
-make a good first lesson in how arithmetic is done, and `tests/blue11/assembler.test.ts` runs
+make a good first lesson in how arithmetic is done, and `packages/blue11/test/assembler.test.ts` runs
 them.
 
 ```
@@ -394,7 +394,7 @@ difference is listed here and in the README:
 ### 9.2 Rules
 
 The full list, with what is enforced by tests, is in the library's
-[`AGENTS.md`](../src/blue11/AGENTS.md). In short:
+[`AGENTS.md`](../packages/blue11/AGENTS.md). In short:
 
 - **Nothing imports from outside the library**, and it has no runtime dependencies. A test fails
   if a file imports from outside the folder, so the boundary can't erode quietly.
@@ -412,5 +412,6 @@ The full list, with what is enforced by tests, is in the library's
 
 The library started as the folder `src/blue11/` inside HackCode, with its own entry point
 (`index.ts`) and tests (`tests/blue11/`). The plan was to move it out "when a second project
-needs it", and the standalone simulator is that project. The move, the npm package and the
-simulator are steps 4–8 of ROADMAP.md §1.
+needs it", and the standalone simulator is that project. It moved here on 2026-11-18, with its
+history, and is published to npm as `blue11`. HackCode depends on the package like any other
+host. What comes next is in [`ROADMAP.md`](ROADMAP.md).

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { assemble, commentStart, disassemble, INSTRUCTIONS, octal } from '../../src/blue11';
-import { DIV16, MUL16 } from '../../src/simulator/examples';
-import { assembleOk } from '../helpers/asm';
+import { assemble, commentStart, disassemble, INSTRUCTIONS, octal } from '../src/index.js';
+import { DIV16, MUL16 } from '../examples/examples.js';
+import { assembleOk } from './helpers/asm';
 import { boot, err, runAsm, words, wordsOf } from './helpers';
 
 describe('blue11 assembler: encoding', () => {
@@ -182,7 +182,7 @@ describe('blue11 disassembler', () => {
   });
 });
 
-describe('blue11 programs from the design (BLUE11_MACHINE.md §7; src/simulator/examples.ts)', () => {
+describe('blue11 programs from the design (BLUE11_MACHINE.md §7; examples/examples.ts)', () => {
   it.each([[7, 9], [123, 100], [0, 55], [255, 255], [1000, 65]])('MUL16 %i × %i', (a, b) => {
     const { cpu } = runAsm(` MOV #${a}., R0\n MOV #${b}., R1\n MOV #77, R2\n JSR PC, MUL16\n HALT\n${MUL16}`);
     expect(cpu.r[0]).toBe((a * b) & 0xffff);

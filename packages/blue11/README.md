@@ -1,11 +1,17 @@
-# `src/blue11/` — Blue-11: CPU, assembler, disassembler, devices
+# Blue-11: CPU, assembler, disassembler, devices
 
 A self-contained TypeScript library. The Blue-11 implements the PDP-11 instruction set (a
 subset of its assembler syntax): the /40 model's set with the EIS option, an assembler, a
-disassembler, a bus with pluggable memory-mapped devices, and DEC's console and line clock. No dependencies. HackCode is its first user, not its owner.
-Design and rationale: [`docs/BLUE11_MACHINE.md`](../../docs/BLUE11_MACHINE.md); devices to come: [`BLUE11_DISPLAY.md`](../../docs/BLUE11_DISPLAY.md), [`BLUE11_KEYBOARD.md`](../../docs/BLUE11_KEYBOARD.md).
+disassembler, a bus with pluggable memory-mapped devices, and DEC's console and line clock. No dependencies. MIT licence.
+Its first users are [HackCode](https://github.com/bluedragon-ctrl/HackCode), a game, and the Blue-11
+simulator (to come). Design and rationale: [`docs/BLUE11_MACHINE.md`](https://github.com/bluedragon-ctrl/Blue11/blob/main/docs/BLUE11_MACHINE.md);
+devices to come: [`BLUE11_DISPLAY.md`](https://github.com/bluedragon-ctrl/Blue11/blob/main/docs/BLUE11_DISPLAY.md), [`BLUE11_KEYBOARD.md`](https://github.com/bluedragon-ctrl/Blue11/blob/main/docs/BLUE11_KEYBOARD.md).
 
-Every code block in this file is run by `tests/blue11/readme-examples.test.ts`, and that
+```sh
+npm install blue11
+```
+
+Every TypeScript block in this file is run by `test/readme-examples.test.ts`, and that
 test fails if a block here isn't in it. If you change an example, change both.
 
 ## Contents
@@ -27,14 +33,14 @@ test fails if a block here isn't in it. If you change an example, change both.
 | You want | Use |
 | :--- | :--- |
 | Run a program with a console (print, keyboard) and a clock | `SimpleMachine` |
-| Your own memory-mapped hardware (sensors, motors, displays), as HackCode's `src/core/robot.ts` does | `DeviceMachine` + your `Device` classes (+ `DL11` / `KW11L` if wanted) |
+| Your own memory-mapped hardware (sensors, motors, displays), as HackCode's robot does | `DeviceMachine` + your `Device` classes (+ `DL11` / `KW11L` if wanted) |
 | Your own memory map, protection, or timing model | `Cpu` with your own `Bus` |
 | Turn source into bytes, a listing, line numbers | `assemble` |
 | Show machine code as text | `disassemble` |
-| Syntax highlighting in CodeMirror 6 | `src/blue11/codemirror.ts` (separate entry point) |
+| Syntax highlighting in CodeMirror 6 | `blue11/codemirror` (separate entry point) |
 
-Import everything from `src/blue11/index.ts` (the only entry point); `codemirror.ts` is a
-second, optional one.
+Import everything from `blue11` (`import { assemble, SimpleMachine } from 'blue11'`);
+`blue11/codemirror` is a second, optional entry point.
 
 ## Conventions
 
@@ -58,7 +64,7 @@ second, optional one.
   `DeviceMachine.add` (overlap, bad address) and `new KW11L(0)` throw `Error`. An exception
   thrown by your own `Bus` or `Device` code passes through `run`.
 - **Determinism rules for contributors:** no DOM, no `Math.random`, no `Date`, no imports
-  from outside this folder (`tests/blue11/boundary.test.ts` enforces the last).
+  from outside this folder (`test/boundary.test.ts` enforces the last).
 
 ## Quick start
 
@@ -126,7 +132,7 @@ directives `.TITLE .SBTTL .IDENT .ENABL .DSABL .LIST .NLIST .PAGE` are accepted 
 A **subset of DEC's original assembler** (RT-11 / RSX-11) with the same syntax and meaning:
 programs inside the subset assemble on the original assembler too, and listings read the
 same. Each claim
-is tested in `tests/blue11/syntax.test.ts` and `syntax-warnings.test.ts`.
+is tested in `test/syntax.test.ts` and `syntax-warnings.test.ts`.
 
 **The same as the original assembler:**
 - Statement format `label: OPCODE operands ; comment`, case-insensitive, commas with or
@@ -440,8 +446,8 @@ for (let a = asm.origin; a < asm.origin + asm.bytes.length;) {
 - `octal(n, digits = 6)`: `octal(0o1000)` → `'001000'`.
 - `REGISTER_NAMES`: `R0`–`R5`, `SP`, `PC`, as the disassembler writes them. `REGISTERS`:
   every name the assembler takes for one (`R0`–`R7`, `SP`, `PC`) with its number.
-- CodeMirror 6 (needs `@codemirror/language` and `@lezer/highlight`):
-  `import { blue11Asm, blue11Highlight } from './blue11/codemirror'`, then
+- CodeMirror 6 (needs `@codemirror/language` and `@lezer/highlight`, optional peer dependencies):
+  `import { blue11Asm, blue11Highlight } from 'blue11/codemirror'`, then
   `extensions: [blue11Asm, blue11Highlight]`. It highlights labels (incl. `1$`),
   mnemonics, directives, registers, numbers, strings and comments.
 
@@ -468,4 +474,4 @@ for (let a = asm.origin; a < asm.origin + asm.bytes.length;) {
 ## Working on the library
 
 Rules, file map and the change checklist for contributors (people and AI agents) are in
-[`AGENTS.md`](AGENTS.md).
+[`AGENTS.md`](https://github.com/bluedragon-ctrl/Blue11/blob/main/packages/blue11/AGENTS.md).

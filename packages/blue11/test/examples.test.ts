@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { EXAMPLES, SIM_SYMBOLS } from '../../src/simulator/examples';
-import { uncommentedLines } from '../helpers/comments';
+import { EXAMPLES, SIM_SYMBOLS } from '../examples/examples.js';
+import { uncommentedLines } from './helpers/comments';
 import { boot } from './helpers';
 
 const run = (source: string, opts: { eis?: boolean; input?: string; budget?: number } = {}) => {

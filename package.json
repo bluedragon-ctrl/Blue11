@@ -1,0 +1,13 @@
+{
+  "name": "blue11-workspace",
+  "private": true,
+  "type": "module",
+  "description": "Blue-11: a PDP-11-style CPU, assembler and devices for teaching, and its simulator",
+  "license": "MIT",
+  "workspaces": ["packages/*"],
+  "scripts": {
+    "test": "npm test --workspaces",
+    "build": "npm run build --workspaces",
+    "typecheck": "npm run typecheck --workspaces"
+  }
+}

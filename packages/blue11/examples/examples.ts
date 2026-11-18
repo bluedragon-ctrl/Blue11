@@ -1,10 +1,9 @@
 /**
  * Example programs for a `SimpleMachine` (DL11 console, KW11-L clock). The standalone
- * simulator page they were written for (docs/ROADMAP.md §1, step 8) is not part of
- * HackCode; tests/blue11/examples.test.ts runs each one and checks it prints `expect`.
+ * simulator (docs/ROADMAP.md) shows them; test/examples.test.ts runs each one and checks it prints `expect`.
  */
 
-import { DEV, PSW_ADDRESS } from '../blue11';
+import { DEV, PSW_ADDRESS } from '../src/index.js';
 
 /** Device register names the examples use (DL11 console, KW11-L clock). */
 export const SIM_SYMBOLS: Record<string, number> = {
@@ -29,7 +28,7 @@ PUTC:   TSTB @#XCSR             ; ready? (bit 7 = sign bit of the low byte)
         MOVB R0, @#XBUF         ; send the character to the terminal
         RTS  PC                 ; back to the caller`;
 
-/** Unsigned 16-bit division, as a subroutine (also used by tests/blue11/assembler.test.ts). */
+/** Unsigned 16-bit division, as a subroutine (also used by test/assembler.test.ts). */
 export const DIV16 = `
 ; DIV16: R0 = R0 / R1, R1 = remainder (unsigned). C = 1 if R1 was 0.
 DIV16:  TST  R1                 ; dividing by 0?
@@ -66,7 +65,7 @@ PRDEC:  MOV  #10., R1            ; divide by ten
         ADD  #'0, R0            ; digit -> character
         JMP  PUTC               ; PUTC returns for us`;
 
-/** 16-bit multiplication without EIS, as a subroutine (also used by tests/blue11/assembler.test.ts). */
+/** 16-bit multiplication without EIS, as a subroutine (also used by test/assembler.test.ts). */
 export const MUL16 = `
 ; MUL16: R0 = R0 * R1 (low 16 bits). Changes R1.
 MUL16:  MOV  R2, -(SP)          ; save R2

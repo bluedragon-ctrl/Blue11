@@ -1,0 +1,32 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+      # The package as users get it: packed, installed, imported by Node.
+      - name: Pack and import
+        working-directory: packages/blue11
+        run: |
+          npm pack --pack-destination "$RUNNER_TEMP"
+          cd "$RUNNER_TEMP" && npm init -y > /dev/null && npm pkg set type=module
+          npm install ./blue11-*.tgz
+          node -e "import('blue11').then(b => { if (!b.assemble(' HALT').ok) process.exit(1); })"

@@ -10,8 +10,8 @@
  * itself what a byte write to its odd (high) byte does.
  */
 
-import { BUS_ERROR, Cpu, PSW_ADDRESS, type Bus, type CpuOptions, type RunResult } from './cpu';
-import type { Program } from './assembler';
+import { BUS_ERROR, Cpu, PSW_ADDRESS, type Bus, type CpuOptions, type RunResult } from './cpu.js';
+import type { Program } from './assembler.js';
 
 export interface Device {
   /** First bus address (even). */

@@ -10,7 +10,7 @@
  * Errors are returned, never thrown.
  */
 
-import { BY_NAME, isFlagOp, octal, REGISTERS, type OpInfo } from './isa';
+import { BY_NAME, isFlagOp, octal, REGISTERS, type OpInfo } from './isa.js';
 
 export type NameStyle = 'dec' | 'long';
 

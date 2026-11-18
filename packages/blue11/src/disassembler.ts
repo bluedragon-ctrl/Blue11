@@ -3,7 +3,7 @@
  * PC-relative targets are shown as absolute addresses (or a name, if `nameOf` knows one).
  */
 
-import { branchOffset, decodeOp, octal, REGISTER_NAMES as REG } from './isa';
+import { branchOffset, decodeOp, octal, REGISTER_NAMES as REG } from './isa.js';
 
 export interface Disassembled {
   address: number;

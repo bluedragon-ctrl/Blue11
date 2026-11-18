@@ -1,16 +1,16 @@
 /**
- * Every ```ts block in src/blue11/README.md is copied here verbatim (import lines aside) and
+ * Every ```ts block in README.md is copied here verbatim (import lines aside) and
  * run, so the documentation an AI or a person copies from is known to work. The last test
  * fails if a README block is missing from this file: edit both together.
  */
 import { describe, expect, it } from 'vitest';
-import readme from '../../src/blue11/README.md?raw';
+import readme from '../README.md?raw';
 import here from './readme-examples.test.ts?raw';
 import {
   assemble, BUS_ERROR, Cpu, DeviceMachine, disassemble, octal, SimpleMachine,
   type AssembleResult, type Bus, type Device,
-} from '../../src/blue11';
-import { formatErrors } from '../helpers/asm';
+} from '../src/index.js';
+import { formatErrors } from './helpers/asm';
 
 const must = (asm: AssembleResult): AssembleResult => {
   if (!asm.ok) throw new Error(formatErrors(asm.errors));

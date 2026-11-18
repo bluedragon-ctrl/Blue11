@@ -1,7 +1,7 @@
 # Blue-11 keyboard: keys for games (spec, not built)
 
 Status: **decided, not built** (2026-11-18). This device is part of the Blue-11
-library and moves with it to its own repository (ROADMAP.md §1). Its first user is the
+library ([ROADMAP.md](ROADMAP.md)). Its first user is the
 standalone simulator, together with the display ([`BLUE11_DISPLAY.md`](BLUE11_DISPLAY.md)).
 
 ## 1. Goals
@@ -247,7 +247,7 @@ The owner accepted every recommendation on 2026-11-18:
 
 ## 10. Tests (written first)
 
-`tests/blue11/keyboard.test.ts`:
+`packages/blue11/test/keyboard.test.ts`:
 
 - **Codes.** `keyCode` maps every `KeyboardEvent.code` in §3 (both Shift, Ctrl and Alt keys to
   one code each) and returns 0 for anything else. `'A` equals `keyCode('KeyA')`.
@@ -265,7 +265,7 @@ The owner accepted every recommendation on 2026-11-18:
 - **Replay.** A live run (events between runs) and a run with the same `log` scheduled by `at`
   give the same registers, memory and cycles. `at` in the past throws. `state()` →
   `JSON.stringify` → `load()` gives the same run.
-- **Example programs** (`src/simulator/examples.ts`, driven by scheduled events):
+- **Example programs** (`packages/blue11/examples/examples.ts`, driven by scheduled events):
   - A dot moved with the arrows, using the key map.
   - `GETKEY` printing key names to the console.
   - A Space counter, using the interrupt.
