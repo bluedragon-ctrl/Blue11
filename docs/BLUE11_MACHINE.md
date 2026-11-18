@@ -271,7 +271,8 @@ down reads `200`, and a release event is a negative byte.
 - **`WAIT`** sleeps until an interrupt is taken, then continues after the `WAIT` once the
   handler's `RTI` has run. The pattern is always "wait, then check again". A host machine skips
   the sleeping cycles straight to the next device event. If no device can wake the CPU, the run
-  stops at once instead of hanging.
+  stops at once instead of hanging. A single step on a sleeping CPU does the same: it sleeps to
+  the next event and takes the interrupt, so a debugger can step through a `WAIT`.
 - **The host can take over a trap:** `onTrap` may answer `'stop'`, for example to serve system
   calls itself or to report a fault. HackCode uses this to stop on a trap whose vector is
   empty and to name the fault.

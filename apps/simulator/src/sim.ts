@@ -239,22 +239,21 @@ export class Simulator {
     const cpu = this.cpu;
     if (cpu.halted) return this.finish('halt', 0);
     let used = 0;
-    if (cpu.waiting) {
-      while (cpu.waiting && used < this.frameCycles) {
-        const r = this.machine.run(1);
-        used += r.cycles;
-        this.feed();
-        if (r.reason === 'wait' && r.cycles === 0) return this.finish('asleep', used);
+    while (true) {
+      // Asleep, the machine sleeps to the next device event; stop it at the next replayed input.
+      const next = this.pending[0]?.cycle;
+      const limit = Math.min(this.frameCycles - used, next !== undefined ? Math.max(1, next - this.machine.cycles) : Infinity);
+      const r = this.machine.step(limit);
+      used += r.cycles;
+      this.feed();
+      if (r.reason === 'trap' || r.reason === 'double-fault' || r.reason === 'halt') {
+        this.trap = r.trap ?? null;
+        return this.finish(r.reason, used);
       }
-      return this.finish(cpu.waiting ? 'frame' : 'step', used);
+      if (r.reason !== 'wait' || r.instructions > 0) return this.finish('step', used);
+      if (r.cycles === 0) return this.finish('asleep', used);
+      if (used >= this.frameCycles) return this.finish('frame', used);
     }
-    const r = this.machine.step();
-    this.feed();
-    if (r.reason === 'trap' || r.reason === 'double-fault' || r.reason === 'halt') {
-      this.trap = r.trap ?? null;
-      return this.finish(r.reason, r.cycles);
-    }
-    return this.finish('step', r.cycles);
   }
 
   private finish(stop: Stop | 'step', cycles: number): StepResult {

@@ -5,6 +5,22 @@ minor version may break the API, and a patch never does. The public API is every
 exported from `blue11` and `blue11/codemirror`, plus the JSON form of saved states
 (`cpu.save()`, `display.state()`, `keyboard.state()`).
 
+## 0.7.0 (2026-11-18)
+
+Stepping through `WAIT`.
+
+- `DeviceMachine.step()` on a CPU asleep in `WAIT` lets time pass to the next device event
+  that can wake it and takes the interrupt, as `run` does (before, it returned `'wait'` with
+  0 cycles, and single-stepping a program waiting for the clock stalled). The result has
+  reason `'budget'`, 0 instructions, and the cycles slept.
+- New optional `step(maxCycles)`: sleep at most that long. Still asleep, `step` returns `'wait'`
+  with the cycles slept; 0 when nothing can wake the CPU, or only host input can and there is
+  no limit.
+- A host that looped `step()` (or `run(1)`) while `cpu.waiting` still works, but now sees time
+  jump by a whole sleep in one call.
+- Simulator: Step in `WAIT` sleeps to the next interrupt (or replayed input) in one call,
+  instead of one cycle at a time.
+
 ## 0.6.0 (2026-11-18)
 
 Loading honestly: a machine says which parts of a program it could not load.

@@ -72,6 +72,37 @@ describe('Simulator', () => {
     expect(s.runFrame().stop).toBe('asleep');
   });
 
+  it('a step in WAIT sleeps to the next input and takes its interrupt', () => {
+    const s = new Simulator();
+    s.load(' MOV #ISR, @#60\n MOV #100, @#177560\n WAIT\n HALT\nISR: MOVB @#177562, R0\n RTI');
+    s.replay([{ cycle: 5000, kind: 'console', ch: 65 }]);
+    for (let i = 0; i < 3; i++) expect(s.step().stop).toBe('step'); // up to and with the WAIT
+    expect(s.cpu.waiting).toBe(true);
+    expect(s.step().stop).toBe('step');
+    expect(s.cpu.waiting).toBe(false);
+    expect(s.cpu.r[7]).toBe(s.addressOfLine(5));
+    expect(s.machine.cycles).toBeGreaterThanOrEqual(5000);
+    expect(s.machine.cycles).toBeLessThan(5100);
+  });
+
+  it('a step in WAIT with nothing due sleeps out the frame in one go', () => {
+    const s = new Simulator();
+    s.load(' MOV #100, @#177560\n WAIT\n HALT');
+    s.step();
+    s.step();
+    const r = s.step();
+    expect(r.stop).toBe('frame');
+    expect(r.cycles).toBe(s.frameCycles);
+    expect(s.cpu.waiting).toBe(true);
+  });
+
+  it('a step in WAIT with nothing that can wake the CPU is reported as asleep', () => {
+    const s = new Simulator();
+    s.load(' WAIT\n HALT');
+    s.step();
+    expect(s.step()).toMatchObject({ stop: 'asleep', cycles: 0 });
+  });
+
   it('counts instructions per address (the heat map)', () => {
     const s = new Simulator();
     s.load(' MOV #3, R0\n1$: SOB R0, 1$\n HALT');

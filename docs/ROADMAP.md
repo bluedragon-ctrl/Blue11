@@ -64,10 +64,9 @@ README as a departure from the original machine.
 8. ~~**Loading honestly.**~~ (done, 2026-11-18, `blue11` 0.6.0): `boot` returns `notLoaded`, the
    ranges outside RAM with their source lines, and `notLoaded(asm)` gives them without booting.
    The simulator shows each one as an error on its line and loads nothing.
-9. **Stepping through `WAIT`.** `DeviceMachine.step()` returns `'wait'` with 0 cycles, so
-   single-stepping a program that waits for the clock or a key stalls. A step on a sleeping
-   CPU should advance the devices to the next event that can wake it (as `run` does) and
-   take the interrupt.
+9. ~~**Stepping through `WAIT`.**~~ (done, 2026-11-18, `blue11` 0.7.0): a step on a sleeping
+   CPU advances the devices to the next event that can wake it (at most `maxCycles`), as `run`
+   does, and takes the interrupt.
 10. **Assembler messages for sizes.** Name the symbol and its line whenever a size depends on
     a later definition (the 0.4.0 fixes cover `.BLKW`, `. =` and register symbols; check every
     other place where pass 1 and pass 2 can disagree, and make "moved between passes" a
