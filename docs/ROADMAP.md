@@ -46,6 +46,54 @@ README as a departure from the original machine.
    index of the predefined names. A search, F1 on the word under the cursor, and hover
    tooltips in the editor. Its tests check that every instruction and name is described once,
    that links resolve, and that the examples assemble and run.
-6. **Later, if wanted:** a third display mode (such as 128 × 128 at 1 bpp), a mouse, more keys,
+6. **Review fixes** (`blue11` 0.4.0, 2026-11-18): a review of the CPU, the assembler and the
+   devices found these, each now with a test:
+   - ~~`HALT` in user mode stopped the machine under `protectModes`~~: it traps to 4
+     (`'privileged'`), and `WAIT` does nothing, as on the /45.
+   - ~~`@-(SP)` passed `stackLimit`~~.
+   - ~~`.BLKW N` / `. = A` with a later symbol, and a register symbol used before its
+     definition, were reported as "moved between passes" on another line~~: errors on their own
+     line.
+   - ~~`.ENABL` / `.DSABL` were all ignored~~: `LSB` and `AMA` work, unsupported functions are
+     errors.
+   - ~~Undocumented: `DIV` into an odd register traps to 10~~; `STKLIM` is the /70's.
+7. **Expressions are 16-bit values.** Today the assembler computes with unbounded integers,
+   so the same word gives different results: `<-1>/2` is 0, but `177777/2` is `077777`. Every
+   operator should wrap to 16 bits, as on the original assembler, with `/` decided and tested
+   (signed or unsigned); "doesn't fit" errors then apply only to the final value of `.WORD`,
+   `.BYTE` and operands. This changes some programs' values, so it is a minor version with a
+   CHANGELOG note.
+8. **Loading honestly.** `DeviceMachine.boot` drops any part of a program outside RAM without
+   a word (`. = 170000` then `.WORD 1`). It should report it: a result from `boot` listing the
+   ranges not loaded (the program's mistake, so a value, not a throw), shown by the simulator
+   on the program's line.
+9. **Stepping through `WAIT`.** `DeviceMachine.step()` returns `'wait'` with 0 cycles, so
+   single-stepping a program that waits for the clock or a key stalls. A step on a sleeping
+   CPU should advance the devices to the next event that can wake it (as `run` does) and
+   take the interrupt.
+10. **Assembler messages for sizes.** Name the symbol and its line whenever a size depends on
+    a later definition (the 0.4.0 fixes cover `.BLKW`, `. =` and register symbols; check every
+    other place where pass 1 and pass 2 can disagree, and make "moved between passes" a
+    message that should never be seen).
+11. **Conditional assembly and repetition:** `.IF` / `.IFF` / `.IFT` / `.ENDC` with `EQ NE GT
+    LT GE LE DF NDF`, `.IIF`, and `.REPT` / `.ENDR`. Small, self-contained, and they let the
+    ROM and the examples drop copy-pasted tables.
+12. **Macros:** `.MACRO` / `.ENDM` with arguments, default values and `.NARG`, then `.IRP` /
+    `.IRPC`. The largest gap from the original assembler; listings show expansions as the
+    original does. Needs a design note in `BLUE11_MACHINE.md` §3 first (what of `.MCALL` the
+    predefined symbols replace).
+13. **More of the /40 and its successors' instructions**, each as an option like `eis`: `SPL`
+    and `MTPS` / `MFPS` (a priority change that works under `protectModes`), and `MARK`.
+14. **`.INCLUDE`** through a host callback (`options.include(name) → source`), so the
+    simulator's ROM routines and a host's library can be shared without pasting. The library
+    stays free of file I/O.
+15. **A differential test against SIMH:** random instruction sequences, compared register by
+    register and flag by flag with traces from SIMH's /40 model (with EIS), checked in as
+    fixtures. It pins down the corners: `ASH` / `ASHC` overflow, `DIV` overflow, `SBC` / `ADC`
+    flags, the order of side effects in `JSR R, @(R)+` and `MOV R, (R)+`.
+16. **Documented restart rules for hosts:** when `onTrap` stops on a fault, the PC is set back
+    but autoincrement and autodecrement have already happened. Say so in the README, and
+    consider an option to undo them (the /45's `SSR1` records exactly this).
+17. **Later, if wanted:** a third display mode (such as 128 × 128 at 1 bpp), a mouse, more keys,
    and a shared UI package for the debugger panels HackCode and the simulator have in common
    (extracted only once both exist).

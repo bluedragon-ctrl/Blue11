@@ -60,5 +60,26 @@ describe('assembler compatibility', () => {
 
   it('listing control directives are accepted and ignored', () => {
     expect(words(' .TITLE T\n .SBTTL S\n .IDENT /1/\n .ENABL LC\n .DSABL GBL\n .LIST\n .NLIST\n .PAGE\n HALT')).toEqual([0]);
+    expect(words(' .ENABL LC, GBL, REG\n .DSABL LCM, CRF\n HALT')).toEqual([0]);
+  });
+
+  it('.ENABL LSB: local labels live until .DSABL LSB or the next .ENABL LSB, across ordinary labels', () => {
+    // BR 1$ at 1000 jumps over B to 1$ at 1004: offset +1.
+    expect(words(' .ENABL LSB\nA: BR 1$\nB: NOP\n1$: HALT\n .DSABL LSB')).toEqual([0o000401, 0o000240, 0]);
+    // After .DSABL LSB the next ordinary label starts a new block again.
+    expect(err(' .ENABL LSB\nA: NOP\n .DSABL LSB\nB: BR 1$\nC: NOP\n1$: HALT')).toMatch(/undefined symbol 1\$/);
+    // A second .ENABL LSB starts a new block.
+    expect(err(' .ENABL LSB\n1$: NOP\n .ENABL LSB\n BR 1$')).toMatch(/undefined symbol 1\$/);
+  });
+
+  it('.ENABL AMA: relative operands are assembled as absolute (@#)', () => {
+    // MOV X, R0 becomes MOV @#X, R0 (013700, address 1004).
+    expect(words(' .ENABL AMA\n MOV X, R0\nX: .WORD 5')).toEqual([0o013700, 0o001004, 5]);
+    expect(words(' .ENABL AMA\n .DSABL AMA\n MOV X, R0\nX: .WORD 5')).toEqual([0o016700, 0o000000, 5]);
+    expect(words(' .ENABL AMA\n MOV @X, R0\nX: .WORD X')).toEqual([0o017700, 0o000000, 0o001004]); // @X stays relative
+  });
+
+  it('.ENABL / .DSABL arguments that change meaning but are not supported are errors', () => {
+    for (const a of ['ABS', 'MCL', 'CDR', 'FPT', 'XYZ', '']) expect(assemble(` .ENABL ${a}`).ok, a).toBe(false);
   });
 });

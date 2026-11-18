@@ -5,6 +5,28 @@ minor version may break the API, and a patch never does. The public API is every
 exported from `blue11` and `blue11/codemirror`, plus the JSON form of saved states
 (`cpu.save()`, `display.state()`, `keyboard.state()`).
 
+## 0.4.0 (2026-11-18)
+
+Correctness fixes from a review of the machine and the assembler. Two changes can break a host:
+a new trap cause, and `.ENABL` / `.DSABL` arguments that used to be ignored.
+
+- `protectModes`: `HALT` outside kernel mode traps to 4 with the new `TrapCause` `'privileged'`
+  instead of halting the machine, and `WAIT` does nothing, as on the /45 and /70. A host that
+  switches over every `TrapCause` gets one more case.
+- `stackLimit` also traps a push through `@-(SP)` (autodecrement deferred), as it already did
+  for `-(SP)`, `JSR` and trap entry.
+- Assembler: `.BLKW N`, `.BLKB N` or `. = A` with the symbol defined later is now an error on
+  that line ("… (N is defined later)"). Before, the line took no room in pass 1, so the only
+  error was "moved between passes" on a later label, or none if no label followed.
+- Assembler: a register symbol (`DIR = %1`) used before its definition is an error on the line
+  that uses it, not "moved between passes" on a later label.
+- Assembler: `.ENABL LSB` / `.DSABL LSB` (a local-label block that ordinary labels don't end)
+  and `.ENABL AMA` (relative operands assembled as `@#`) work as on the original assembler.
+  `LC LCM GBL REG CRF` are still accepted and ignored; any other function, or none, is an
+  error (they were all ignored before).
+- Docs: `DIV` into an odd register traps to 10 (a departure, now listed), and `stackLimit` is
+  in the style of the /70's `STKLIM`, not the /45's.
+
 ## 0.3.0 (2026-11-18)
 
 - `Keyboard`: keys for games (docs/BLUE11_KEYBOARD.md). A key map at `177000` (a byte per key,

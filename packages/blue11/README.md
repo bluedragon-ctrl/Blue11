@@ -129,8 +129,10 @@ Expressions are evaluated strictly left to right (no precedence; `< >` groups) w
 `(R)+`, `-(R)`, `X(R)`, `@`-forms of each, `#n`, `@#addr`, and a bare `addr` (PC-relative).
 Registers `R0`–`R7`, `SP`, `PC`.
 
-**Directives:** `.WORD .BYTE .ASCII .ASCIZ .BLKW .BLKB .EVEN .ODD .END`. The listing
-directives `.TITLE .SBTTL .IDENT .ENABL .DSABL .LIST .NLIST .PAGE` are accepted and ignored.
+**Directives:** `.WORD .BYTE .ASCII .ASCIZ .BLKW .BLKB .EVEN .ODD .END`, and `.ENABL` /
+`.DSABL` with `LSB` (a local-label block that ordinary labels don't end) and `AMA` (relative
+operands assembled as absolute `@#`). The listing directives `.TITLE .SBTTL .IDENT .LIST .NLIST
+.PAGE`, and the `.ENABL` / `.DSABL` functions `LC LCM GBL REG CRF`, are accepted and ignored.
 
 ### Assembler compatibility
 
@@ -146,8 +148,12 @@ is tested in `test/syntax.test.ts` and `syntax-warnings.test.ts`.
 - Strict left-to-right evaluation, no precedence (`1+2*3` is 9), `< >` groups.
 - `NAME = expr`, `NAME = %n`, the location counter `.` (`. = . + 10`, `BR .+4`). `LABEL::`
   and `NAME == expr` (the global forms) are accepted as `:` and `=`; there is no linker.
-- Local labels `n$` between two ordinary labels; all eight addressing modes with the PC
-  forms `#n`, `@#a`, `LABEL`, `@LABEL`.
+- Local labels `n$` between two ordinary labels, or from `.ENABL LSB` to `.DSABL LSB` (or the
+  next `.ENABL LSB`); all eight addressing modes with the PC forms `#n`, `@#a`, `LABEL`,
+  `@LABEL`. `.ENABL AMA` assembles `LABEL` as `@#LABEL`.
+- A size or address must be known when the line is reached: `.BLKW N` or `. = A` with `N`
+  or `A` defined later is an error on that line, and so is a register symbol (`DIR = %1`)
+  used before its definition.
 - `.END expr` sets the start address and ends the source.
 - An expression where the instruction goes is an implicit `.WORD`: `TABLE: CMD1, CMD2`,
   `1234`. An instruction name first on a line is always the instruction, and a name
@@ -171,6 +177,8 @@ is tested in `test/syntax.test.ts` and `syntax-warnings.test.ts`.
   memory image.
 - Errors and warnings are values with line and column, not listing flags. `^X` hex exists
   only with the `hex` option.
+- `.ENABL` / `.DSABL` functions other than `LSB AMA LC LCM GBL REG CRF` (`ABS`, `MCL`, `CDR`,
+  `FPT`, …) are errors.
 
 **Not supported** (always an error, never silently ignored): macros (`.MACRO .MCALL .IRP
 .REPT .NARG`), conditional assembly (`.IF .IIF`), sections and linking (`.PSECT .CSECT
@@ -211,7 +219,7 @@ const r = cpu.run(1000);                           // { reason: 'halt', … }; R
 | :--- | :--- | :--- |
 | `eis` | `false` | `MUL`, `DIV`, `ASH`, `ASHC`; without it they trap to 10 |
 | `cycles` | `'per-bus-access'` | every bus read or write costs 1 cycle (instruction fetches included), `MUL` +4, `DIV` +8, `ASH`/`ASHC` +1. `'flat'`: 1 per instruction |
-| `protectModes` | `false` | the /45 model's rules when PSW bits 15–14 ≠ 0: a write to the PSW address traps to 4, `RTI`/`RTT` can't lower the mode bits or change the priority, `RESET` does nothing |
+| `protectModes` | `false` | the /45 model's rules when PSW bits 15–14 ≠ 0: a write to the PSW address traps to 4, `RTI`/`RTT` can't lower the mode bits or change the priority, `HALT` traps to 4 (cause `'privileged'`), `RESET` and `WAIT` do nothing |
 
 | Member | |
 | :--- | :--- |
@@ -223,7 +231,7 @@ const r = cpu.run(1000);                           // { reason: 'halt', … }; R
 | `onInstruction: (pc, opcode) => void` | every instruction once fetched, before it runs. Not called for a fetch that faults or for interrupts |
 | `onAccess: (addr, value, write, byte) => void` | every bus access that succeeds, instruction fetches and the PSW's bus address included; `value` is a byte for byte accesses. Not called for a faulting access |
 | `onModeChange: (mode, old) => void` | PSW bits 15–14 changed (trap, `RTI`, PSW write) |
-| `stackLimit` | a push through SP below this address traps to 4 before writing (cause `'stack-limit'`); 0 = off |
+| `stackLimit` | a push through SP below this address (`-(SP)`, `@-(SP)`, `JSR`, trap entry) traps to 4 before writing (cause `'stack-limit'`); 0 = off |
 | `r` | `number[8]`; `r[6]` = SP, `r[7]` = PC. Writable |
 | `psw`, `n` `z` `v` `c`, `priority`, `mode` | status word (writable) and read-only views of it |
 | `waiting`, `halted` | asleep in `WAIT`; stopped by `HALT` / double fault (`run` does nothing until you clear it) |
@@ -242,8 +250,9 @@ this call only.
 | `'breakpoint'` | PC reached a breakpoint | `run` again (passes it) |
 
 `TrapInfo`: `{ vector, cause, pc, detail? }`. `cause`: `'odd-address' 'bus-error'
-'stack-limit'` (vector 4, `detail` = the address), `'illegal'` (10: unknown opcode, EIS
-off, `JMP`/`JSR` to a register), `'bpt' 'trace'` (14), `'iot'` (20), `'emt' 'trap'` (30 /
+'stack-limit'` (vector 4, `detail` = the address), `'privileged'` (4: `HALT` outside kernel
+mode with `protectModes`), `'illegal'` (10: unknown opcode, EIS off, `JMP`/`JSR` to a
+register, `DIV` into an odd register), `'bpt' 'trace'` (14), `'iot'` (20), `'emt' 'trap'` (30 /
 34, `detail` = the number), `'interrupt'`. (`'reserved'` is in the type but not produced.)
 Constants: `VEC` (trap vectors), `PSW` (bit masks), `PSW_ADDRESS` (`177776`).
 
@@ -286,7 +295,8 @@ later; `RESET` calls `bus.reset()`; `JSR PC, @(SP)+` pops the target before push
 (11/40 order).
 
 **Where it departs from the real machine:** `JMP`/`JSR` to a register traps to 10 (the
-models differed; 10 is the illegal-instruction vector). Not implemented: `MARK`, `SPL`,
+models differed; 10 is the illegal-instruction vector). `DIV` into an odd register traps to
+10 (the original gives undefined results). Not implemented: `MARK`, `SPL`,
 `MFPI`/`MTPI`, `MFPS`/`MTPS`, floating point, memory management. With `protectModes` the
 mode rules are the /45 model's, without its memory management: protect memory yourself by
 refusing writes in `bus.write`. The [display](#display) is a teaching device DEC never made:

@@ -162,6 +162,25 @@ describe('blue11 assembler: errors are values with line and column', () => {
   });
 });
 
+describe('blue11 assembler: sizes that pass 1 cannot know', () => {
+  it('.BLKW / .BLKB / . = with a later symbol: the error is on that line, and nothing moves', () => {
+    for (const src of [' .BLKW N\nL: HALT\nN = 5', ' .BLKB N\nN = 5', ' . = A\n HALT\nA = 2000']) {
+      const a = assemble(src);
+      expect(a.errors.map((e) => [e.line, e.message]), src).toEqual([
+        [1, expect.stringMatching(/needs .*known.*N|A is defined later/)],
+      ]);
+    }
+    expect(err(' .BLKW N\nL: HALT\nN = 5')).toBe('.BLKW needs a size known at this point (N is defined later)');
+    expect(err(' . = A\n HALT\nA = 2000')).toBe('the location counter can only move to a known address (A is defined later)');
+  });
+
+  it('a register alias used before its definition: an error on the line that uses it', () => {
+    const a = assemble('START: MOV #1, DIR\nL: HALT\nDIR = %1\n .END START');
+    expect(a.errors.map((e) => [e.line, e.message])).toEqual([[1, 'DIR is used before DIR = %n defines it as a register']]);
+    expect(assemble('DIR = %1\nSTART: MOV #1, DIR\n .END START').ok).toBe(true);
+  });
+});
+
 describe('blue11 disassembler', () => {
   it('shows targets as absolute addresses or names', () => {
     const w = words(' BR X\n MOV @#X, R0\n JSR PC, X\nX: HALT');

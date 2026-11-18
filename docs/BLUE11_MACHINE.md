@@ -364,14 +364,17 @@ difference is listed here and in the README:
 3. **Values that don't fit are errors** in the assembler, where the original flagged them and
    assembled anyway.
 4. **`JMP` / `JSR` to a register traps to 10**, the illegal-instruction vector (the original
-   models differed).
+   models differed). So does **`DIV` into an odd register**, whose result the original leaves
+   undefined.
 5. **Not implemented:** macros, sections and linking, floating point, memory management, `MARK`,
    `SPL`, `MFPI` / `MTPI`, `MFPS` / `MTPS`. Using any of them is always an error, never silently
    ignored.
-6. **`protectModes`** gives the /45 model's mode rules without its memory management. The host
-   protects memory itself, by refusing writes on its bus.
-7. **`stackLimit`** is a single register in the style of the /45 model's `STKLIM`: a push below
-   it traps to 4.
+6. **`protectModes`** gives the /45 model's mode rules without its memory management: outside
+   kernel mode, PSW writes and `HALT` trap to 4, `RTI` / `RTT` can't lower the mode or change
+   the priority, and `RESET` and `WAIT` do nothing. The host protects memory itself, by
+   refusing writes on its bus.
+7. **`stackLimit`** is a single register in the style of the /70 model's `STKLIM` (the /45 has a
+   fixed limit): a push below it traps to 4.
 8. **Teaching devices** that DEC never made: the display ([`BLUE11_DISPLAY.md`](BLUE11_DISPLAY.md))
    and the keyboard ([`BLUE11_KEYBOARD.md`](BLUE11_KEYBOARD.md)). Their vectors and register
    addresses are ours. The console (DL11) and the line clock (KW11-L) keep DEC's addresses and
