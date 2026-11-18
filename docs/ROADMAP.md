@@ -57,12 +57,10 @@ README as a departure from the original machine.
    - ~~`.ENABL` / `.DSABL` were all ignored~~: `LSB` and `AMA` work, unsupported functions are
      errors.
    - ~~Undocumented: `DIV` into an odd register traps to 10~~; `STKLIM` is the /70's.
-7. **Expressions are 16-bit values.** Today the assembler computes with unbounded integers,
-   so the same word gives different results: `<-1>/2` is 0, but `177777/2` is `077777`. Every
-   operator should wrap to 16 bits, as on the original assembler, with `/` decided and tested
-   (signed or unsigned); "doesn't fit" errors then apply only to the final value of `.WORD`,
-   `.BYTE` and operands. This changes some programs' values, so it is a minor version with a
-   CHANGELOG note.
+7. ~~**Expressions are 16-bit values**~~ (done, 2026-11-18, `blue11` 0.5.0): every operator
+   wraps to 16 bits, as on the original assembler, and `/` is signed (`177777/2` and `<-1>/2` are
+   both 0). Only a number as written can fail to fit (an error, also in `NAME = expr`); `.BYTE`
+   takes −200…377, and branches across address 0 work.
 8. **Loading honestly.** `DeviceMachine.boot` drops any part of a program outside RAM without
    a word (`. = 170000` then `.WORD 1`). It should report it: a result from `boot` listing the
    ranges not loaded (the program's mistake, so a value, not a throw), shown by the simulator

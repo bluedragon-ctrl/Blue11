@@ -109,6 +109,8 @@ like DEC's system macro library. For example, the simulator predefines `SCREEN`,
 **Expressions** are evaluated strictly **left to right**, with `< >` for grouping, as in the
 original assembler: `2+3*4` is 20, and `2+<3*4>` is 14. The operators are `+ - * /`, `&` (and)
 and `!` (or). Students meet this once and remember it, and it is part of the period charm.
+Every operator works on 16-bit words, as on the original: `177777+2` is 1, and `/` is signed,
+so `177777/2` and `<-1>/2` are both 0. A number written larger than `177777` is an error.
 The assembler warns when `*` or `/` follows `+` or `-` without `< >`.
 
 **Not supported:** `.MACRO`, `.PSECT`, `.GLOBL`, conditional assembly, and linking. A program is

@@ -5,6 +5,24 @@ minor version may break the API, and a patch never does. The public API is every
 exported from `blue11` and `blue11/codemirror`, plus the JSON form of saved states
 (`cpu.save()`, `display.state()`, `keyboard.state()`).
 
+## 0.5.0 (2026-11-18)
+
+Assembler expressions are 16-bit values, as in the original assembler. Some programs assemble
+to different values, so check any that relied on the old arithmetic.
+
+- Every operator (`+ - * / & !`, unary `-`, `^C`) works on 16-bit words, so the same word gives
+  the same result however it is written. Sums and products wrap at every step (`177777+2` is 1,
+  `<100000+100000>/2` is 0); before, they were computed with unbounded integers and only the final
+  value was checked.
+- `/` is signed: `177777/2` is 0, as `<-1>/2` is (it was `077777`); `-6/4` is `177777` (−1,
+  rounded towards zero).
+- A number as written that doesn't fit 16 bits (`200000`, `65536.`, `^B` with 17 digits) is an
+  error everywhere, also in `NAME = expr`, where it used to be a warning ("doesn't fit 16 bits:
+  X = …"). A result of operators never is: `X = 100000*2` is 0, with no warning.
+- `.BYTE` takes −200…377 (`177600`–`177777` are the negative bytes), and its error shows the value
+  in octal.
+- Branch and `SOB` offsets are computed in 16 bits, so a branch across address 0 works.
+
 ## 0.4.0 (2026-11-18)
 
 Correctness fixes from a review of the machine and the assembler. Two changes can break a host:

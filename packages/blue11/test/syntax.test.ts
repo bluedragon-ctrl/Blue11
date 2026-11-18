@@ -21,6 +21,35 @@ describe('assembler compatibility', () => {
     expect(words('.WORD 1+2*3, 1+<2*3>, 17&5!40, 10-1&6, 1!2, -1')).toEqual([9, 7, 0o45, 6, 3, 0xffff]);
   });
 
+  it('every operator works on 16-bit words: the same word gives the same result', () => {
+    // / is signed: 177777 is −1, so 177777/2 is 0, as <-1>/2.
+    expect(words('.WORD <-1>/2, 177777/2, -6/4, 177772/4, 6/-4, 100000/-1, 77777/2')).toEqual([0, 0, 0xffff, 0xffff, 0xffff, 0o100000, 0o37777]);
+    // + - * wrap to 16 bits at every step, not only at the end.
+    expect(words('.WORD 177777+2, 0-1, 100000*2, 177777*177777, <100000+100000>/2, -100000')).toEqual([1, 0xffff, 0, 1, 0, 0o100000]);
+    expect(words('X = 177777\n .WORD X+1, X*X, X/X, -X, ^C<X+1>')).toEqual([0, 1, 1, 1, 0xffff]);
+    // A product or sum that overflows is not an error: the result is the 16-bit word.
+    expect([...assembleOk(' MOV #100000*4+1, R0\n .WORD 170000+10000').bytes.slice(2, 4)]).toEqual([1, 0]);
+    expect(assemble('X = 100000*2').warnings).toEqual([]);
+  });
+
+  it('a number too big for 16 bits is an error; bytes take −200…377', () => {
+    expect(err('.WORD 200000')).toMatch(/200000 doesn't fit 16 bits/);
+    expect(err('X = 200000')).toMatch(/200000 doesn't fit 16 bits/);
+    expect(err('.WORD 65536.')).toMatch(/65536\. doesn't fit 16 bits/);
+    expect(err('.WORD ^B10000000000000000')).toMatch(/doesn't fit 16 bits/);
+    expect(words('.WORD 177777, 65535., -100000')).toEqual([0xffff, 0xffff, 0o100000]);
+    expect([...assembleOk('.BYTE 377, -1, -200, 177600, 177777').bytes]).toEqual([0o377, 0o377, 0o200, 0o200, 0o377]);
+    expect(err('.BYTE 400')).toMatch(/000400 doesn't fit in a byte/);
+    expect(err('.BYTE -201')).toMatch(/177577 doesn't fit in a byte/);
+  });
+
+  it('branches and SOB compute their offsets in 16 bits, across address 0', () => {
+    expect(words('. = 177774\n BR 2\n').at(-1)).toBe(0o000402);
+    expect(assemble('. = 2\n BR 177776').ok).toBe(true);
+    expect(err(' BR .+404')).toMatch(/too far/);
+    expect(err(' TRAP -1')).toMatch(/0–377/);
+  });
+
   it('assignment, register symbols, the location counter, global forms', () => {
     expect(assembleOk('N = 5\nN2 == 6\nX = %2\nA:: CLR X\n. = . + 10\nB: BR .+4').symbols.get('B')).toBe(0o1000 + 2 + 8);
   });
