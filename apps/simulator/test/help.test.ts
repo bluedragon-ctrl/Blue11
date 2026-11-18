@@ -7,6 +7,7 @@
 import { assemble, INSTRUCTIONS } from 'blue11';
 import { describe, expect, it } from 'vitest';
 import { HELP, inComment, parseInline, SECTIONS, wordAt, type Block, type Entry } from '../src/help';
+import { OP_GROUPS } from '../src/help/instructions';
 import { blockTexts } from '../src/help/model';
 import { SYMBOL_HELP } from '../src/help/symbols';
 import { programSymbols } from '../src/rom';
@@ -42,6 +43,11 @@ describe('help coverage', () => {
     expect(new Set(shown)).toEqual(new Set(names));
   });
 
+  it('gives every instruction group a section', () => {
+    expect(SECTIONS.filter((s) => s.id.startsWith('ins-')).flatMap((s) => s.blocks).filter((b) => b.kind === 'entries').length)
+      .toBe(OP_GROUPS.length);
+  });
+
   it('has unique section ids and anchors', () => {
     const ids = SECTIONS.map((s) => s.id);
     expect(new Set(ids).size).toBe(ids.length);
@@ -67,9 +73,11 @@ describe('help coverage', () => {
 
   it('has no unclosed markup', () => {
     for (const { section, block } of blocks()) {
-      for (const text of blockTexts(block)) {
+      // an entry's detail (the flags: `N* Z*`) is shown as it is, without markup
+      const texts = block.kind === 'entries' ? block.entries.flatMap((e) => [e.term, e.text]) : blockTexts(block);
+      for (const text of texts) {
         const plainText = parseInline(text).filter((s) => s.kind === 'text').map((s) => s.text).join('');
-        expect(plainText, `${section}: ${text}`).not.toMatch(/`|\*\*|\]\(/);
+        expect(plainText, `${section}: ${text}`).not.toMatch(/`|\*|\]\(/);
       }
     }
   });
@@ -114,6 +122,19 @@ describe('help examples', () => {
     const mem = run('memory').cpu.r;
     expect([mem[0], mem[2], mem[3]]).toEqual([1, 0o30, 'I'.charCodeAt(0)]);
     expect(run('traps').cpu.r[1]).not.toBe(0);
+    expect(run('registers').cpu.r[7] - 2).toBe(0o1014); // the HALT at ZERO
+    // the big picture: R0 = 3 + 5, stored at C (1022), and the HALT at 1014 as its table says
+    const big = run('computer');
+    expect([big.cpu.r[0], big.machine.read(0o1022, false), big.cpu.r[7]]).toEqual([0o10, 0o10, 0o1016]);
+    expect(run('directives').cpu.r.slice(0, 2)).toEqual([3, 0o1014]);
+    expect(run('ins-move').cpu.r.slice(0, 3)).toEqual([0, 5, 0o101]);
+    // R0 R1 R2 R3 R4 R5 after the mode tour; LIST is at 1022
+    expect(run('modes', 0).cpu.r.slice(0, 6)).toEqual([0o22, 0o1024, 0o11, 0o33, 0o11, 0o22]);
+    expect(run('modes', 1).cpu.r.slice(2, 5)).toEqual([5, 6, 6]);
+    expect(run('ins-arith').cpu.r[0]).toBe(0o177763);
+    expect(run('ins-logic').cpu.r[0]).toBe(0o334);
+    expect(run('ins-branch', 0).cpu.r[0]).toBe(7);
+    expect(run('ins-branch', 1).cpu.r[0]).toBe(0o17);
     expect(run('console').machine.output).toBe('HELLO');
     // three ticks of the line clock: three frames
     const clock = run('interrupts');
@@ -148,26 +169,30 @@ describe('help lookup', () => {
   });
 
   it('F1 leads to instructions, byte forms, names, registers and directives', () => {
-    expect(HELP.topicFor('mov')).toEqual({ section: 'instructions', anchor: 'op-MOV' });
-    expect(HELP.topicFor('MOVB')).toEqual({ section: 'instructions', anchor: 'op-MOV' });
-    expect(HELP.topicFor('BLO')).toEqual({ section: 'instructions', anchor: 'op-BCS' });
-    expect(HELP.topicFor('DSPCS')).toEqual({ section: 'display', anchor: 'sym-DSPCS' });
+    expect(HELP.topicFor('mov')).toEqual({ section: 'ins-move', anchor: 'op-MOV' });
+    expect(HELP.topicFor('MOVB')).toEqual({ section: 'ins-move', anchor: 'op-MOV' });
+    expect(HELP.topicFor('BLO')).toEqual({ section: 'ins-branch', anchor: 'op-BCS' });
+    expect(HELP.topicFor('DSPCS')).toEqual({ section: 'display-frames', anchor: 'sym-DSPCS' });
+    expect(HELP.topicFor('DSPPAL')).toEqual({ section: 'palette', anchor: 'sym-DSPPAL' });
+    expect(HELP.topicFor('KBDBUF')).toEqual({ section: 'keyboard-events', anchor: 'sym-KBDBUF' });
+    expect(HELP.topicFor('MUL')).toEqual({ section: 'ins-eis', anchor: 'op-MUL' });
     expect(HELP.topicFor('KBDKEY')).toEqual({ section: 'keyboard', anchor: 'sym-KBDKEY' });
     expect(HELP.topicFor('K.SPC')).toEqual({ section: 'keyboard', anchor: 'sym-K.SPC' });
     expect(HELP.topicFor('XBUF')).toEqual({ section: 'console', anchor: 'sym-XBUF' });
     expect(HELP.topicFor('DRAWCH')).toEqual({ section: 'rom', anchor: 'sym-DRAWCH' });
     expect(HELP.topicFor('SP')).toEqual({ section: 'registers', anchor: 'reg-SP' });
     expect(HELP.topicFor('R3')).toEqual({ section: 'registers', anchor: 'reg-R0' });
-    expect(HELP.topicFor('.WORD')).toEqual({ section: 'assembler', anchor: 'dir-.WORD' });
+    expect(HELP.topicFor('.WORD')).toEqual({ section: 'directives', anchor: 'dir-.WORD' });
     expect(HELP.topicFor('#SCREEN')).toEqual({ section: 'display', anchor: 'sym-SCREEN' });
     expect(HELP.topicFor('LOOP')).toBeNull();
   });
 
   it('searches names first, then text', () => {
-    expect(HELP.search('dspcs')[0]).toMatchObject({ section: 'display', anchor: 'sym-DSPCS' });
+    expect(HELP.search('dspcs')[0]).toMatchObject({ section: 'display-frames', anchor: 'sym-DSPCS' });
     expect(HELP.search('DRAW')[0].anchor).toMatch(/^sym-DRAWC/);
-    expect(HELP.search('palette').some((h) => h.section === 'display')).toBe(true);
-    expect(HELP.search('double buffering').some((h) => h.section === 'display')).toBe(true);
+    expect(HELP.search('palette').some((h) => h.section === 'palette')).toBe(true);
+    expect(HELP.search('double buffering').some((h) => h.section === 'display-frames')).toBe(true);
+    expect(HELP.search('octal').some((h) => h.section === 'octal')).toBe(true);
     expect(HELP.search('   ')).toEqual([]);
   });
 });

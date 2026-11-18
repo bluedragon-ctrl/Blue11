@@ -182,6 +182,11 @@ dialog.help[open] { display: flex; }
 .help-entries dd { margin: 0.1rem 0 0 1.5rem; }
 .help-entries dt.flash, .help-entries dt.flash + dd { animation: help-flash 1.6s ease-out; }
 @keyframes help-flash { from { background: #39d0ff55; } to { background: transparent; } }
+.help-pager { display: flex; justify-content: space-between; gap: 1rem; margin-top: 2rem; padding-top: 0.6rem; border-top: 1px solid var(--line); }
+.help-pager a { display: flex; flex-direction: column; text-decoration: none; padding: 0.2rem 0.5rem; border-radius: 3px; }
+.help-pager a:hover { background: #39d0ff18; }
+.help-pager .next { text-align: right; margin-left: auto; }
+.help-pager .dir { font-size: 0.75rem; opacity: 0.6; color: var(--fg); }
 .help-hits { list-style: none; padding: 0; }
 .help-hits li { padding: 0.2rem 0; display: flex; gap: 1rem; align-items: baseline; }
 .help-hits .where { font-size: 0.78rem; opacity: 0.55; }

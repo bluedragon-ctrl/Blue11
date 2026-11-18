@@ -518,7 +518,8 @@ export function startPage(): void {
   }
 
   function drawScreen(): void {
-    const f = sim.display.frame;
+    // Once the program has ended, the monitor shows memory as it is (sim.screenNow).
+    const f = !running && sim.ended ? sim.screenNow() : sim.display.frame;
     if (f === shownFrame) return;
     shownFrame = f;
     if (canvas.width !== f.width) { canvas.width = f.width; canvas.height = f.height; crt.style.setProperty('--rows', String(f.height)); }
@@ -593,7 +594,7 @@ export function startPage(): void {
     const f = d.frame;
     // Stopped mid-frame, a marker shows the row the beam reads next (DSPLIN).
     const row = d.line;
-    const midFrame = !running && !!sim.program && row !== 0o177777;
+    const midFrame = !running && !!sim.program && !sim.ended && row !== 0o177777;
     beamRow.hidden = !midFrame;
     if (midFrame) beamRow.style.top = `calc(var(--tube) + (100% - 2 * var(--tube)) * ${(row + 0.5) / d.height})`;
     // Items are kept whole when the line wraps.

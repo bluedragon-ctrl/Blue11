@@ -45,7 +45,10 @@ README as a departure from the original machine.
    the stack, traps, interrupts, the console, line clock, display, keyboard and ROM, and an
    index of the predefined names. A search, F1 on the word under the cursor, and hover
    tooltips in the editor. Its tests check that every instruction and name is described once,
-   that links resolve, and that the examples assemble and run.
+   that links resolve, and that the examples assemble and run. Then made more approachable:
+   short pages (instructions a page per group, the display and keyboard split, running and
+   debugging apart), a first-program walk-through, octal numbers, the usual mistakes, a
+   glossary, more small examples whose results are tested, and Previous / Next links.
 6. **Review fixes** (`blue11` 0.4.0, 2026-11-18): a review of the CPU, the assembler and the
    devices found these, each now with a test:
    - ~~`HALT` in user mode stopped the machine under `protectModes`~~: it traps to 4

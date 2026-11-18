@@ -8,7 +8,7 @@
  */
 
 import {
-  assemble, octal, SimpleMachine, type AsmError, type AssembleResult, type Beam, type Key, type StopReason, type TrapInfo,
+  assemble, DSP, octal, SimpleMachine, type AsmError, type AssembleResult, type Beam, type Frame, type Key, type StopReason, type TrapInfo,
 } from 'blue11';
 import { makeRom, programSymbols } from './rom';
 
@@ -112,6 +112,38 @@ export class Simulator {
   }
 
   get display() { return this.machine.display!; }
+
+  /** Whether the program has ended: a HALT, a trap with no handler, a double fault, or a WAIT nothing can wake. */
+  get ended(): boolean {
+    return this.last === 'halt' || this.last === 'trap' || this.last === 'double-fault' || this.last === 'asleep';
+  }
+
+  /**
+   * The picture a monitor shows while the CPU stands still: pixel memory as it is now, in the
+   * page and mode `DSPCS` selects, with the palette now (what the next vertical blanks would
+   * latch). A halted CPU does not stop a real monitor, and a program that halts within its
+   * first frame (`MOVB #16, @#SCREEN+4040` / `HALT`) has no frame of its own.
+   */
+  screenNow(): Frame {
+    const d = this.display;
+    const csr = this.machine.read(DSP.DSPCS, false);
+    const mode = csr & 4 ? 1 : 0;
+    const H = mode ? 128 : 64;
+    const pixels = new Uint8Array(H * H);
+    const b = d.bytes;
+    for (let r = 0; r < H; r++) {
+      if (mode) {
+        const at = (csr & 1) * 0o20000 + r * 0o100;
+        for (let i = 0; i < 64; i++) { pixels[r * H + 2 * i] = b[at + i] & 15; pixels[r * H + 2 * i + 1] = b[at + i] >> 4; }
+      } else {
+        const at = (csr & 3) * 0o10000 + r * 0o100;
+        for (let x = 0; x < 64; x++) pixels[r * H + x] = b[at + x] & 15;
+      }
+    }
+    const palette = new Uint16Array(16 * H);
+    for (let r = 0; r < H; r++) palette.set(d.palette, 16 * r);
+    return { width: H, height: H, number: d.frame.number, pixels, palette };
+  }
   get keyboard() { return this.machine.keyboard!; }
   get cpu() { return this.machine.cpu; }
   /** Cycles per frame (20000). */

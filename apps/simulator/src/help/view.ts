@@ -99,7 +99,25 @@ export class HelpView {
   }
 
   private renderSection(s: Section): void {
-    this.content.replaceChildren(el('h2', undefined, s.title), ...s.blocks.map((b) => renderBlock(b, (t) => this.go(t))));
+    this.content.replaceChildren(el('h2', undefined, s.title), ...s.blocks.map((b) => renderBlock(b, (t) => this.go(t))), this.pager(s));
+  }
+
+  /** Links to the previous and the next section, to read the help in order. */
+  private pager(s: Section): HTMLElement {
+    const all = this.index.sections;
+    const i = all.indexOf(s);
+    const nav = el('nav', 'help-pager');
+    const link = (to: Section | undefined, cls: string, label: string) => {
+      if (!to) { nav.append(el('span', cls)); return; }
+      const a = el('a', cls);
+      a.href = '#';
+      a.append(el('span', 'dir', label), el('span', 'title', to.title));
+      a.addEventListener('click', (ev) => { ev.preventDefault(); this.go({ section: to.id }); });
+      nav.append(a);
+    };
+    link(all[i - 1], 'prev', '← Previous');
+    link(all[i + 1], 'next', 'Next →');
+    return nav;
   }
 }
 
@@ -110,6 +128,7 @@ export function renderInline<T extends HTMLElement>(into: T, text: string, go: (
       case 'text': into.append(s.text); break;
       case 'code': into.append(el('code', undefined, s.text)); break;
       case 'bold': into.append(el('strong', undefined, s.text)); break;
+      case 'italic': into.append(el('em', undefined, s.text)); break;
       case 'link': {
         const a = el('a', undefined, s.text);
         a.href = '#';

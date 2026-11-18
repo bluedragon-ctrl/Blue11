@@ -16,6 +16,11 @@ deployed to GitHub Pages from `main`: **[bluedragon-ctrl.github.io/Blue11](https
   sleeps to the next interrupt and stops in its handler (at most a frame).
 - **Screen** (the display, mode 0 or 1), **Listing** (the assembler's listing, the PC's row
   lit) and **ROM** (its listing) tabs.
+- **The screen after the end.** While a program runs, the screen shows the frames the display
+  latches. Once it has ended (`HALT`, a trap with no handler, a double fault, a `WAIT` nothing
+  can wake), it shows pixel memory as it is, in the page and mode `DSPCS` selects
+  (`Simulator.screenNow`), as a real monitor goes on refreshing while the CPU is halted.
+  Otherwise a program that halts within its first frame would leave the screen black.
 - **Console** (the DL11 terminal), below the tabs, so it stays in view with each of them.
 - **Retro** (on unless turned off, kept in the browser): the machine's own views in the look of
   the period. The screen is a CRT in its bezel, with one faint scanline per row the display
@@ -35,13 +40,19 @@ deployed to GitHub Pages from `main`: **[bluedragon-ctrl.github.io/Blue11](https
   program again and feeds the log at the same cycles, so the run happens again exactly.
   **Save** writes the program, its settings and the log to a `.replay.json` file; **Open**
   plays one.
-- **Help** (the button, or F1): the instructions, addressing modes, assembler, the machine
-  (memory, cycles, the stack, traps, interrupts), the devices (console, line clock, display,
-  keyboard), the ROM's routines and every predefined name, with a search. **F1 in the editor**
+- **Help** (the button, or F1): short pages for students, read in order with Previous / Next
+  links: getting started (a first program, octal numbers, running, debugging, the usual
+  mistakes), the assembler and its directives, registers, addressing modes, the instructions
+  (an overview, then a page per group, with examples), the machine (memory, cycles, the stack,
+  traps, interrupts), the devices (console, line clock, display, keyboard), the ROM's
+  routines, every predefined name and a glossary, with a search. **F1 in the editor**
   opens it at the word under the cursor (an instruction, a register, a directive, a device
   name), and resting the mouse on one shows its entry in a tooltip. It is HackCode's help
   (`src/ui/help/` there), ported with the simulator's own text.
-- **Programs.** The menu has the library's examples (console, display, keyboard), the ROM's
+- **Programs.** The menu starts with **First steps** (`src/first-steps.ts`), eight short
+  programs for beginners, each adding one idea (a pixel, registers, variables, a loop, a
+  decision, printing, a subroutine, a key-driven dot); a fresh page opens the first. Then the
+  library's examples (console, display, keyboard), the ROM's
   showcase, and **My programs**, saved in this browser (`localStorage`). The editor's text is
   kept between visits. **Share** copies a link with the program and its settings in the URL
   (`#code=…`), not the input.
