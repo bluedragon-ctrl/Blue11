@@ -125,7 +125,10 @@ to agree with it.
 Local labels (`1$`, `2$`, …) are scoped between two ordinary labels. Numbers: octal, `10.`
 decimal, `^D ^O ^B` radix prefixes, `'A` one character, `"AB` two (low byte first).
 Expressions are evaluated strictly left to right (no precedence; `< >` groups) with
-`+ - * / & !` (`!` is OR) and unary `-`, `^C` (complement). Addressing modes: `R`, `(R)`,
+`+ - * / & !` (`!` is OR) and unary `-`, `^C` (complement). Every operator works on 16-bit
+words, as in the original assembler: sums and products wrap (`177777+2` is 1), and `/` is
+signed (`177777/2` is 0, the same as `<-1>/2`). A number as written must fit 16 bits
+(`177777`, `65535.`); `200000` is an error. Addressing modes: `R`, `(R)`,
 `(R)+`, `-(R)`, `X(R)`, `@`-forms of each, `#n`, `@#addr`, and a bare `addr` (PC-relative).
 Registers `R0`–`R7`, `SP`, `PC`.
 
@@ -167,7 +170,7 @@ is tested in `test/syntax.test.ts` and `syntax-warnings.test.ts`.
 - **Names longer than six characters are an error** with `names: 'dec'`. The original keeps
   the first six silently, so `COUNTER1` and `COUNTER2` would be one symbol there.
   `names: 'long'` allows any length and `_`, which the original does not.
-- **Values that don't fit are errors** (`.BYTE 400`, a branch out of range, `TRAP 400`);
+- **Values that don't fit are errors** (`200000`, `.BYTE 400`, a branch out of range, `TRAP 400`);
   the original flags them in the listing (`T`, `A`) and assembles anyway.
 - **Mixing clear and set flag operations** (`CLC!SEV`) is an error; the original would quietly
   make it a set.
@@ -185,7 +188,7 @@ is tested in `test/syntax.test.ts` and `syntax-warnings.test.ts`.
 .ASECT .GLOBL .LIMIT`), `.RADIX`, `.RAD50` and `^R`, `.REM`, `.PRINT`, floating point
 (`.FLT2 .FLT4`, FP11 instructions), and the instructions missing from the CPU (below).
 
-**Warnings** today: a value cut to 16 bits in `NAME = expr`; a symbol named like an
+**Warnings** today: a symbol named like an
 instruction; a name alone on a line (an implicit `.WORD`: often a missing instruction or a
 label that lost its colon); `*` or `/` after `+` or `-` in one expression without `< >`
 (evaluated left to right, so `1+2*3` is 9).

@@ -130,7 +130,7 @@ const assembler: Section = {
         + 'Case does not matter. A seventh character is an error. The [predefined names](symbols), register names and instruction names cannot be used as labels.'),
       e('syn-local', [], 'Local labels `1$`', '`1$` to `99$` are labels that only live between two ordinary labels, so every routine can have its own `1$:` loop.'),
       e('syn-numbers', [], 'Numbers', '`17` is **octal** (fifteen). `15.` is decimal. `^D15`, `^O17` and `^B1111` name the base. `\'A` is the code of the character A. Negative numbers: `-1` is 177777.'),
-      e('syn-expr', [], 'Expressions', 'Operators `+ - * /`, `&` (and), `!` (or), evaluated strictly **left to right**: `2+3*4` is 24 (octal), `2+<3*4>` is 16. Use `< >` to group. '
+      e('syn-expr', [], 'Expressions', 'Operators `+ - * /`, `&` (and), `!` (or), evaluated strictly **left to right**: `2+3*4` is 24 (octal), `2+<3*4>` is 16. Use `< >` to group. Values are 16-bit words: `177777+2` is 1, and `/` is signed (`177777/2` is 0, as `<-1>/2`). '
         + 'The assembler warns about `*` or `/` after `+` or `-` without `< >`. `@#SCREEN+4040` is the pixel at row 40, column 40.'),
       e('syn-equ', ['='], '`NAME = value`', 'Define a constant: `WIDTH = 100`, then `MOV #WIDTH, R0`. `PTR = %3` makes `PTR` another name for R3.'),
       e('syn-dot', ['.'], '`.`', 'The location counter: the address being assembled. `. = 2000` moves it; `. = . + 20` skips 20 bytes.'),

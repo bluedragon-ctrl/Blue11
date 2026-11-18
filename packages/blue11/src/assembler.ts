@@ -5,6 +5,7 @@
  * symbol), `. = expr`. Numbers are octal; a trailing `.` makes them decimal; `^D` `^O`
  * `^B` name the radix; `'A` is a character, `"AB` two. Expressions run strictly left to
  * right with `< >` for grouping; operators `+ - * / & !`, unary `-`, `^C` (complement).
+ * Every operator works on 16-bit words (`/` signed), as in the original assembler.
  * Local labels `1$`–`65535$` live between two ordinary labels.
  *
  * Errors are returned, never thrown.
@@ -356,7 +357,6 @@ class Assembler {
     if (this.labels.has(key)) throw new AsmFail(`${name} is a label`, column);
     const v = this.expr(exprText, exprCol);
     if (!v.undef || this.pass === 1) this.symbols.set(key, v.value & 0xffff);
-    if (!v.undef && !fits16(v.value)) this.warn(`${v.value < 0 ? "-" : ""}${Math.abs(v.value).toString(8)} doesn't fit 16 bits: ${key} = ${octal(v.value & 0xffff)}`, exprCol);
     if (BY_NAME.has(key)) this.warn(`${key} is also an instruction; as a value it now means this symbol`, column);
   }
 
@@ -379,7 +379,8 @@ class Assembler {
         const bytes: number[] = [];
         for (const p of dataArgs(args, col)) {
           const v = this.expr(p.text, p.column);
-          if (!v.undef && (v.value < -128 || v.value > 255)) throw new AsmFail(`${v.value} doesn't fit in a byte`, p.column);
+          // −200…377: a signed or an unsigned byte (−200 is the word 177600).
+          if (!v.undef && v.value > 0o377 && v.value < 0o177600) throw new AsmFail(`${octal(v.value)} doesn't fit in a byte (−200…377)`, p.column);
           bytes.push(v.value & 0xff);
         }
         this.emit(bytes, false);
@@ -396,7 +397,7 @@ class Assembler {
       case '.BLKB': {
         const v = args.trim() === '' ? { value: 1, undef: false } : this.expr(args, col);
         if (v.undef) throw new SizeFail(`${name} needs a size known at this point`, col, v.undefName);
-        if (v.value < 0 || v.value > 0o77777) throw new AsmFail(`bad size ${v.value}`, col);
+        if (v.value > 0o77777) throw new AsmFail(`bad size ${octal(v.value)}`, col);
         if (name === '.BLKW' && (here & 1)) throw new AsmFail('.BLKW at an odd address (add .EVEN before it)', nameCol);
         this.emit(new Array<number>(name === '.BLKW' ? v.value * 2 : v.value).fill(0), false);
         return true;
@@ -543,7 +544,7 @@ class Assembler {
         want(1, 'a target label');
         const t = this.expr(parts[0].text, parts[0].column);
         if (!t.undef) {
-          const diff = t.value - (here + 2);
+          const diff = signed16(t.value - (here + 2));
           if (diff & 1) throw new AsmFail('branch target at an odd address', parts[0].column);
           const off = diff / 2;
           if (off < -128 || off > 127) throw new AsmFail(`branch target too far (${off} words; the limit is −128…127, use JMP)`, parts[0].column);
@@ -557,7 +558,7 @@ class Assembler {
         const t = this.expr(parts[1].text, parts[1].column);
         let off = 0;
         if (!t.undef) {
-          const diff = here + 2 - t.value;
+          const diff = signed16(here + 2 - t.value);
           if (diff & 1) throw new AsmFail('SOB target at an odd address', parts[1].column);
           off = diff / 2;
           if (off < 1 || off > 63) throw new AsmFail(`SOB only jumps backwards, at most 63 words (here ${-off})`, parts[1].column);
@@ -569,7 +570,7 @@ class Assembler {
         if (parts.length > 1) throw new AsmFail(`${op.name} takes at most one number`, col);
         if (parts.length === 1) {
           const v = this.expr(parts[0].text, parts[0].column);
-          if (!v.undef && (v.value < 0 || v.value > 0o377)) throw new AsmFail(`${op.name} numbers are 0–377`, parts[0].column);
+          if (!v.undef && v.value > 0o377) throw new AsmFail(`${op.name} numbers are 0–377`, parts[0].column);
           words[0] |= v.value & 0o377;
         }
         break;
@@ -604,7 +605,7 @@ class Assembler {
     }
     if (up.startsWith('%')) {
       const v = this.expr(up.slice(1), column + 1);
-      if (v.value < 0 || v.value > 7) throw new AsmFail('registers are %0–%7', column);
+      if (v.value > 7) throw new AsmFail('registers are %0–%7', column);
       return v.value;
     }
     return null;
@@ -636,9 +637,7 @@ class Assembler {
   }
 
   private word(text: string, column: number): number {
-    const v = this.expr(text, column);
-    if (!v.undef && !fits16(v.value)) throw new AsmFail(`${v.value} doesn't fit 16 bits`, column);
-    return v.value & 0xffff;
+    return this.expr(text, column).value;
   }
 
   // ------------------------------------------------------------------ expressions
@@ -696,9 +695,9 @@ class Assembler {
   }
 }
 
-/** Fits a 16-bit word, as unsigned or signed. */
-function fits16(v: number): boolean {
-  return v >= -0x8000 && v <= 0xffff;
+/** A 16-bit word as a signed number, −100000…77777. */
+function signed16(v: number): number {
+  return ((v & 0xffff) ^ 0x8000) - 0x8000;
 }
 
 /** The arguments of .WORD / .BYTE; none means one 0. */
@@ -818,12 +817,13 @@ class ExprParser {
       this.i++;
       const r = this.term();
       switch (op) {
-        case '+': v = v + r; break;
-        case '-': v = v - r; break;
-        case '*': v = v * r; break;
+        // Every operator works on 16-bit words, as in the original assembler. / is signed.
+        case '+': v = (v + r) & 0xffff; break;
+        case '-': v = (v - r) & 0xffff; break;
+        case '*': v = Math.imul(v, r) & 0xffff; break;
         case '/':
           if (r === 0) { if (!this.undef) throw new AsmFail('division by zero', this.col + this.i); v = 0; }
-          else v = Math.trunc(v / r);
+          else v = Math.trunc(signed16(v) / signed16(r)) & 0xffff;
           break;
         case '&': v = v & r; break;
         default: v = v | r; break;
@@ -837,7 +837,7 @@ class ExprParser {
     const c = s[this.i];
     const at = this.col + this.i;
     if (c === undefined) throw new AsmFail('missing value', at);
-    if (c === '-') { this.i++; return -this.term(); }
+    if (c === '-') { this.i++; return -this.term() & 0xffff; }
     if (c === '+') { this.i++; return this.term(); }
     if (c === '<') {
       this.i++;
@@ -868,7 +868,7 @@ class ExprParser {
         const h = /^[0-9A-Fa-f]+/.exec(s.slice(this.i));
         if (!h) throw new AsmFail('^X needs hexadecimal digits', at);
         this.i += h[0].length;
-        return parseInt(h[0], 16);
+        return this.fit(parseInt(h[0], 16), `^X${h[0]}`, at);
       }
       const radix = k === 'D' ? 10 : k === 'O' ? 8 : k === 'B' ? 2 : 0;
       if (!radix) throw new AsmFail(`unknown ^${k} (use ^D, ^O, ^B or ^C)`, at);
@@ -877,14 +877,14 @@ class ExprParser {
       const v = parseInt(m[0], radix);
       if (Number.isNaN(v) || [...m[0]].some((d) => +d >= radix)) throw new AsmFail(`bad digit for ^${k}: ${m[0]}`, at);
       this.i += m[0].length;
-      return v;
+      return this.fit(v, `^${k}${m[0]}`, at);
     }
     const num = /^([0-9]+)(\.?)(?![A-Za-z0-9$_])/.exec(s.slice(this.i));
     if (num) {
       this.i += num[0].length;
-      if (num[2]) return parseInt(num[1], 10);
+      if (num[2]) return this.fit(parseInt(num[1], 10), num[0], at);
       if (/[89]/.test(num[1])) throw new AsmFail(`${num[1]} is not octal (write ${num[1]}. for decimal)`, at);
-      return parseInt(num[1], 8);
+      return this.fit(parseInt(num[1], 8), num[0], at);
     }
     const sym = /^([0-9]+\$|[A-Za-z.$_][A-Za-z0-9.$_]*)/.exec(s.slice(this.i));
     if (sym) {
@@ -898,6 +898,12 @@ class ExprParser {
       return v;
     }
     throw new AsmFail(`can't read "${s.slice(this.i)}"`, at);
+  }
+
+  /** A number as written must fit a word (177777, 65535.); results of operators wrap instead. */
+  private fit(v: number, text: string, at: number): number {
+    if (v > 0xffff) throw new AsmFail(`${text} doesn't fit 16 bits`, at);
+    return v;
   }
 }
 
