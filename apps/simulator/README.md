@@ -34,6 +34,12 @@ deployed to GitHub Pages from `main`: **[bluedragon-ctrl.github.io/Blue11](https
   program again and feeds the log at the same cycles, so the run happens again exactly.
   **Save** writes the program, its settings and the log to a `.replay.json` file; **Open**
   plays one.
+- **Help** (the button, or F1): the instructions, addressing modes, assembler, the machine
+  (memory, cycles, the stack, traps, interrupts), the devices (console, line clock, display,
+  keyboard), the ROM's routines and every predefined name, with a search. **F1 in the editor**
+  opens it at the word under the cursor (an instruction, a register, a directive, a device
+  name), and resting the mouse on one shows its entry in a tooltip. It is HackCode's help
+  (`src/ui/help/` there), ported with the simulator's own text.
 - **Programs.** The menu has the library's examples (console, display, keyboard), the ROM's
   showcase, and **My programs**, saved in this browser (`localStorage`). The editor's text is
   kept between visits. **Share** copies a link with the program and its settings in the URL
@@ -57,6 +63,7 @@ in mode 1.
 | `src/programs.ts` | The examples menu, and the ROM showcase programs |
 | `src/debug.ts`, `src/traps.ts` | The debugger's views (disassembly, memory, stack, registers) and what a trap means, as text |
 | `src/storage.ts` | Saved programs and share links |
+| `src/help/` | The help: its text (`sections.ts`, `instructions.ts`, `symbols.ts`), the search and F1 lookup (`model.ts`, no DOM), the dialog and the editor's tooltips |
 | `src/editor.ts` | The editor's breakpoint, heat, error and PC decorations (as in HackCode) |
 | `src/page.ts`, `index.html`, `src/style.css` | The page |
 
@@ -70,5 +77,6 @@ by the page to pace frames; the simulation's time is cycles.
 - `npm run dev`: a local dev server.
 - `npm test`: the tests. Every example runs as the page runs it, and they check what it
   prints and the frames it draws; the ROM's routines are checked against the font for every
-  character.
+  character. The help describes every instruction and predefined name exactly once, its links
+  resolve, its examples assemble, and the ones marked to run do, with the results it promises.
 - `npm run build`: typecheck, then build to `dist/`.

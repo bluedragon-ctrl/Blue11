@@ -34,7 +34,7 @@ console.log(m.output);      // HELLO
   display](docs/BLUE11_DISPLAY.md) and [a keyboard](docs/BLUE11_KEYBOARD.md).
 - **The simulator:** [bluedragon-ctrl.github.io/Blue11](https://bluedragon-ctrl.github.io/Blue11/),
   in the browser: write programs that draw on a screen and read the keyboard, then step
-  through them with the registers, memory and disassembly in view
+  through them with the registers, memory and disassembly in view, with a searchable help
   ([`apps/simulator`](apps/simulator/README.md)).
 - **What comes next:** [`docs/ROADMAP.md`](docs/ROADMAP.md).
 - **Used by:** [HackCode](https://github.com/bluedragon-ctrl/HackCode), a game where you program
