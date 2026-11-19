@@ -15,8 +15,8 @@ import { EditorView, keymap, lineNumbers } from '@codemirror/view';
 import { frameToRgba, keyCode, octal, type AsmError, type Frame } from 'blue11';
 import { blue11Asm, blue11Highlight } from 'blue11/codemirror';
 import {
-  addressNamer, charOf, disassemblyAround, explorerInstructions, explorerRows, inRom, lineHeat, memoryLayout, memoryRows,
-  memorySnapshot, parseAddress, READ_TAKES, regionOf, registerText, ROW_WORDS, stackRows, vectorName, type MemCell, type Role,
+  addressNamer, charOf, disassemblyAround, explorerInstructions, explorerRows, inRom, lineHeat, MAP_COLS, MAP_ROWS, mapAddress,
+  mapCell, memoryLayout, memoryMapRgba, memoryRows, memorySnapshot, parseAddress, READ_TAKES, regionOf, registerText, ROW_WORDS, stackRows, vectorName, type MemCell, type Role,
 } from './debug';
 import { breakpointLines, debugExtensions, setErrors, setHeat, setPcLine, toggleBreakpointAtCursor } from './editor';
 import { CYCLES_PER_SECOND, lastHalfPeriod, shouldPlay } from './audio';
@@ -616,9 +616,10 @@ export function startPage(): void {
     const at = explorerStart();
     mxAddr.classList.toggle('bad', at === null);
     const box = $('mx-rows');
+    layout = memoryLayout(prog, romAssembly(), cpu.r[6], Math.max(sim.stackTop, cpu.r[6] & 0xfffe));
+    drawMap(at);
     if (at === null) { box.replaceChildren(div('empty', 'An octal address, a label, a device name or a register.')); return; }
     const nameOf = addressNamer(prog);
-    layout = memoryLayout(prog, romAssembly(), cpu.r[6], Math.max(sim.stackTop, cpu.r[6] & 0xfffe));
     const r = regionOf(at);
     const end = Math.min(0o200000, (at & ~0o17) + MX_ROWS * 2 * ROW_WORDS);
     $('mx-where').textContent = `${octal(at & ~0o17)}–${octal(end - 1)} · ${r.name} (${octal(r.start)}–${octal(r.end - 1)}): ${r.about}.`;
@@ -675,6 +676,73 @@ export function startPage(): void {
     box.replaceChildren(...rows);
     if (picked === null) $('mx-detail').replaceChildren(div('empty', 'Click a word to see what it is: its bytes, its label, the line that made it.'));
   }
+
+  // The map: a dot per word (the canvas has 2 × 2 pixels per dot, for the marks).
+  const mapCanvas = $<HTMLCanvasElement>('mx-map');
+  const mapCtx = mapCanvas.getContext('2d')!;
+  const mapDots = Object.assign(document.createElement('canvas'), { width: MAP_COLS, height: MAP_ROWS });
+  const mapDotsCtx = mapDots.getContext('2d')!;
+  const mapImage = mapDotsCtx.createImageData(MAP_COLS, MAP_ROWS);
+  const showMap = $<HTMLInputElement>('mx-show-map');
+  /** Memory as the map last drew it, for the text under the pointer. */
+  let mapWords: Int32Array | null = null;
+
+  function drawMap(at: number | null): void {
+    $('mx-map-box').hidden = $('mx-map-at').hidden = !showMap.checked;
+    if (!showMap.checked || !layout) return;
+    mapWords = memorySnapshot(peekRead);
+    memoryMapRgba(mapWords, layout, mapImage.data, { heat: sim.heat, before });
+    mapDotsCtx.putImageData(mapImage, 0, 0);
+    const k = mapCanvas.width / MAP_COLS;
+    mapCtx.imageSmoothingEnabled = false;
+    mapCtx.drawImage(mapDots, 0, 0, mapCanvas.width, mapCanvas.height);
+    // the region boundaries
+    mapCtx.fillStyle = '#ffffff40';
+    for (const a of [0o120000, 0o160000, 0o170000]) mapCtx.fillRect(0, mapCell(a).y * k - 1, mapCanvas.width, 1);
+    // the bytes shown below: 1000 bytes from `at`, one row of the map, or the ends of two
+    if (at !== null) {
+      const s = mapCell(at & ~0o17);
+      mapCtx.strokeStyle = '#ffffffc0';
+      mapCtx.lineWidth = 1;
+      mapCtx.strokeRect(s.x * k + 0.5, s.y * k - 1.5, (MAP_COLS - s.x) * k - 1, k + 3);
+      if (s.x && s.y + 1 < MAP_ROWS) mapCtx.strokeRect(0.5, (s.y + 1) * k - 1.5, s.x * k - 1, k + 3);
+    }
+    const ring = (addr: number, colour: string) => {
+      const c = mapCell(addr);
+      mapCtx.strokeStyle = colour;
+      mapCtx.lineWidth = 2;
+      mapCtx.strokeRect(c.x * k - 3, c.y * k - 3, k + 6, k + 6);
+    };
+    ring(sim.cpu.r[6], '#3cff3c');
+    ring(sim.cpu.r[7], '#ffffff');
+    if (picked !== null) ring(picked, '#39d0ff');
+  }
+
+  /** The word under the pointer on the map. */
+  function mapAt(e: MouseEvent): number {
+    const r = mapCanvas.getBoundingClientRect();
+    const x = Math.min(MAP_COLS - 1, Math.max(0, Math.floor(((e.clientX - r.left) / r.width) * MAP_COLS)));
+    const y = Math.min(MAP_ROWS - 1, Math.max(0, Math.floor(((e.clientY - r.top) / r.height) * MAP_ROWS)));
+    return mapAddress(x, y);
+  }
+  mapCanvas.addEventListener('mousemove', (e) => {
+    const a = mapAt(e);
+    const w = mapWords?.[a >> 1] ?? -1;
+    const c: MemCell = { address: a, value: w < 0 ? null : w, role: layout?.role(a) ?? null };
+    const name = addressNamer(sim.program)(a);
+    if (name) c.name = name;
+    const n = sim.heat[a >> 1];
+    $('mx-map-at').textContent = cellText(c) + (n ? ` · run ${octal(n, 1)} times` : '');
+  });
+  mapCanvas.addEventListener('mouseleave', () => { $('mx-map-at').textContent = 'Point at the map: the address and what is there. Click: show it below.'; });
+  mapCanvas.addEventListener('click', (e) => {
+    const a = mapAt(e);
+    // a few rows before it, so that it is near the top
+    mxAddr.value = octal(Math.max(0, Math.min(0o200000 - MX_ROWS * 2 * ROW_WORDS, (a & ~0o17) - 4 * 2 * ROW_WORDS)));
+    picked = a;
+    show();
+  });
+  showMap.addEventListener('change', show);
 
   function showDetail(c: MemCell): void {
     const d = $('mx-detail');

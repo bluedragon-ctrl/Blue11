@@ -634,7 +634,12 @@ const memory: Section = {
       'The buttons jump to each region: the PC, SP, the program, the vectors, the page the screen shows, the ROM and the devices. '
         + 'Typed `PC` or `SP`, the view follows the register as it moves. **words**, **bytes** and **instructions** read the same bits three ways: '
         + 'read as instructions, data turns into nonsense instructions, and read as bytes, an instruction shows its two halves. '
-        + 'The debugger never reads `RBUF` or `KBDBUF` (shown as `------`): reading them would take the character from the program.')),
+        + 'The debugger never reads `RBUF` or `KBDBUF` (shown as `------`): reading them would take the character from the program.'),
+    e('mem-map', [], 'The map of all memory',
+      'Above the rows, the **map** shows all 64 KB at once, a dot per word and 1000 bytes to a row, in the same colours: '
+        + 'your program is a few dots near the top, the pixel memory is the band at 120000, the ROM and the devices are at the bottom. '
+        + 'A 0 is dim, black means nothing answers there, red is what the last command changed, and the more often a word ran as an instruction, the whiter it is. '
+        + 'The PC has a white square, SP a green one, and a frame shows the 1000 bytes in the rows. Point at a dot to see what is there; click it to show it in the rows. The **map** box hides it.')),
   ],
 };
 

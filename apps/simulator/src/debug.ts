@@ -267,3 +267,49 @@ export function explorerInstructions(read: Read, layout: MemoryLayout, start: nu
   }
   return rows;
 }
+
+// ---------------------------------------------------------------- the map of all memory
+
+/** The map has a cell per word: 400 words (1000 bytes) a row, 200 rows for the 64 KB. */
+export const MAP_COLS = 0o400;
+export const MAP_ROWS = 0o200;
+/** The address of the word in map cell (x, y), and back. */
+export const mapAddress = (x: number, y: number): number => ((y * MAP_COLS + x) * 2) & 0xffff;
+export const mapCell = (addr: number): { x: number; y: number } => ({ x: ((addr & 0xffff) >> 1) % MAP_COLS, y: (addr & 0xffff) >> 9 });
+
+type Rgb = readonly [number, number, number];
+/** The map's colours: by role where the assembler or the stack says, else by region. */
+export const MAP_COLOURS: Readonly<Record<Role | Region | 'none' | 'changed', Rgb>> = {
+  code: [0x39, 0xd0, 0xff], operand: [0x8f, 0x6f, 0xff], data: [0xff, 0xb3, 0x00], stack: [0x3c, 0xff, 0x3c],
+  vectors: [0xff, 0x6f, 0xc8], ram: [0x7a, 0x8a, 0x9c], pixels: [0xb0, 0x7c, 0xff], rom: [0x6f, 0x8a, 0xa0], io: [0xff, 0x7f, 0x50],
+  none: [0x0b, 0x0e, 0x12], changed: [0xff, 0x4d, 0x4d],
+};
+
+/**
+ * The map as RGBA (MAP_COLS × MAP_ROWS pixels) from a {@link memorySnapshot}: a word's colour is
+ * its role or its region, dim when it holds 0; black where nothing answers. Words run as
+ * instructions (`heat`) go towards white, the more often the whiter; words that differ from
+ * `before` are red.
+ */
+export function memoryMapRgba(words: Int32Array, layout: MemoryLayout, out: Uint8ClampedArray,
+  opts: { heat?: Uint32Array; before?: Int32Array | null } = {}): void {
+  const { heat, before } = opts;
+  let most = 0;
+  if (heat) for (let w = 0; w < 0x8000; w++) if (heat[w] > most) most = heat[w];
+  const scale = most ? 1 / Math.log(1 + most) : 0;
+  let r = REGIONS[0];
+  for (let w = 0; w < 0x8000; w++) {
+    const a = w << 1;
+    if (a >= r.end) r = regionOf(a);
+    const v = words[w];
+    const role = layout.role(a);
+    let c: Rgb = v < 0 ? MAP_COLOURS.none : MAP_COLOURS[role ?? r.region];
+    let k = v === 0 ? (role ? 0.55 : 0.3) : 1;
+    let white = 0;
+    if (before && before[w] !== v) { c = MAP_COLOURS.changed; k = 1; }
+    else if (heat && heat[w]) white = 0.3 + 0.7 * Math.log(1 + heat[w]) * scale;
+    const o = w * 4;
+    for (let i = 0; i < 3; i++) out[o + i] = c[i] * k * (1 - white) + 255 * white;
+    out[o + 3] = 255;
+  }
+}
