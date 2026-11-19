@@ -272,13 +272,15 @@ like that. The default, `beam: 'instant'`, does not tear.
   | `170000`–`176577` | nothing: bus error |
   | `176600`–`176657` | display registers |
   | `176700`–`176703` | keyboard registers ([`BLUE11_KEYBOARD.md`](BLUE11_KEYBOARD.md)) |
+  | `176740`–`176743` | sound registers ([`BLUE11_SOUND.md`](BLUE11_SOUND.md)) |
   | `177000`–`177177` | keyboard: one byte per key |
   | `177546` | line clock `LKS` |
   | `177560`–`177567` | console (DL11) |
   | `177776` | `PSW` |
 
 - **The simulator's predefined names** (at most 6 characters): `SCREEN` = `120000`, `DSPCS`,
-  `DSPFRM`, `DSPLIN`, `DSPPAL`, `DSPVEC` = `320`, and the ROM's names `FONT`, `DRAWCH`, `DRAWC1`
+  `DSPFRM`, `DSPLIN`, `DSPPAL`, `DSPVEC` = `320`, the keyboard's and the sound's (`SNDCS`,
+  `SNDDIV`), and the ROM's names `FONT`, `DRAWCH`, `DRAWC1`
   (§11).
 
 ## 7. Reset

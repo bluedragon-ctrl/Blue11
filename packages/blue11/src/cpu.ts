@@ -153,6 +153,9 @@ export class Cpu {
 
   private pending: Array<{ vector: number; level: number }> = [];
   private cyc = 0;
+  /** Inside `run` or `step`: the cycles of the instructions and interrupts already finished in it. */
+  private spent = 0;
+  private active = false;
   /** Address of the instruction being executed. */
   private ipc = 0;
 
@@ -173,6 +176,21 @@ export class Cpu {
    * `resume` (default) a breakpoint at the current PC is passed, so Continue works.
    */
   run(maxCycles: number, breakpoints?: ReadonlySet<number>, resume = true): RunResult {
+    this.active = true;
+    try { return this.runInner(maxCycles, breakpoints, resume); } finally { this.active = false; }
+  }
+
+  /**
+   * During `run` or `step`, the cycles from their start to the bus access in progress (its
+   * first cycle), so a device can tell exactly when it is written; 0 outside them. With
+   * `cycles: 'flat'`, the cycles up to the start of the current instruction.
+   */
+  get elapsed(): number {
+    if (!this.active) return 0;
+    return this.spent + (this.cycleModel === 'per-bus-access' ? Math.max(0, this.cyc - 1) : 0);
+  }
+
+  private runInner(maxCycles: number, breakpoints: ReadonlySet<number> | undefined, resume: boolean): RunResult {
     let cycles = 0;
     let instructions = 0;
     // A breakpoint at the PC we resume from is passed; once the PC has moved on (an
@@ -180,6 +198,7 @@ export class Cpu {
     let armed = !resume;
     while (true) {
       if (this.halted) return { reason: 'halt', cycles, instructions };
+      this.spent = cycles;
       const taken = this.takeInterrupt();
       if (taken.stop) return { reason: 'trap', cycles: cycles + taken.cycles, instructions, trap: taken.stop };
       if (taken.cycles > 0) armed = true;
@@ -190,6 +209,7 @@ export class Cpu {
       if (breakpoints && armed && breakpoints.has(this.r[PC])) {
         return { reason: 'breakpoint', cycles, instructions };
       }
+      this.spent = cycles;
       const s = this.execute();
       cycles += s.cycles;
       instructions++;
@@ -200,7 +220,13 @@ export class Cpu {
 
   /** Exactly one instruction (or the interrupt waiting to be taken). For debuggers. */
   step(): RunResult {
+    this.active = true;
+    try { return this.stepInner(); } finally { this.active = false; }
+  }
+
+  private stepInner(): RunResult {
     if (this.halted) return { reason: 'halt', cycles: 0, instructions: 0 };
+    this.spent = 0;
     const taken = this.takeInterrupt();
     if (taken.stop) return { reason: 'trap', cycles: taken.cycles, instructions: 0, trap: taken.stop };
     if (taken.fault) return { reason: 'double-fault', cycles: taken.cycles, instructions: 0, trap: taken.fault };

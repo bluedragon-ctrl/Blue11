@@ -3,10 +3,10 @@
 A self-contained TypeScript library. The Blue-11 implements the PDP-11 instruction set (a
 subset of its assembler syntax): the /40 model's set with the EIS option, an assembler, a
 disassembler, a bus with pluggable memory-mapped devices, DEC's console and line clock, a
-read-only memory, a framebuffer display for teaching graphics, and a keyboard for games. No dependencies. MIT licence.
+read-only memory, a framebuffer display for teaching graphics, a keyboard for games, and a one-bit speaker. No dependencies. MIT licence.
 Its first users are [HackCode](https://github.com/bluedragon-ctrl/HackCode), a game, and the Blue-11
 [simulator](https://bluedragon-ctrl.github.io/Blue11/). Design and rationale: [`docs/BLUE11_MACHINE.md`](https://github.com/bluedragon-ctrl/Blue11/blob/main/docs/BLUE11_MACHINE.md);
-the display: [`BLUE11_DISPLAY.md`](https://github.com/bluedragon-ctrl/Blue11/blob/main/docs/BLUE11_DISPLAY.md); the keyboard: [`BLUE11_KEYBOARD.md`](https://github.com/bluedragon-ctrl/Blue11/blob/main/docs/BLUE11_KEYBOARD.md).
+the display: [`BLUE11_DISPLAY.md`](https://github.com/bluedragon-ctrl/Blue11/blob/main/docs/BLUE11_DISPLAY.md); the keyboard: [`BLUE11_KEYBOARD.md`](https://github.com/bluedragon-ctrl/Blue11/blob/main/docs/BLUE11_KEYBOARD.md); the sound: [`BLUE11_SOUND.md`](https://github.com/bluedragon-ctrl/Blue11/blob/main/docs/BLUE11_SOUND.md).
 
 ```sh
 npm install blue11
@@ -26,10 +26,11 @@ test fails if a block here isn't in it. If you change an example, change both.
 7. [SimpleMachine](#simplemachine)
 8. [Display](#display): a framebuffer, two modes, 16 colours, an optional scanning beam
 9. [Keyboard](#keyboard): which keys are down, and every press and release in a queue
-10. [Host recipes](#host-recipes): console input, coverage, system calls, breakpoints, snapshots, disassembly
-11. [Disassembler, ISA tables, CodeMirror](#disassembler-isa-tables-codemirror)
-12. [Pitfalls](#pitfalls)
-13. [Working on the library](#working-on-the-library) (→ `AGENTS.md`)
+10. [Sound](#sound): a one-bit speaker, switched by the program or by a tone generator
+11. [Host recipes](#host-recipes): console input, coverage, system calls, breakpoints, snapshots, disassembly
+12. [Disassembler, ISA tables, CodeMirror](#disassembler-isa-tables-codemirror)
+13. [Pitfalls](#pitfalls)
+14. [Working on the library](#working-on-the-library) (→ `AGENTS.md`)
 
 ## Which layer to use
 
@@ -38,6 +39,7 @@ test fails if a block here isn't in it. If you change an example, change both.
 | Run a program with a console (print, keyboard) and a clock | `SimpleMachine` |
 | … and a screen to draw on | `SimpleMachine({ display: true })` |
 | … and keys for games (held down, pressed, released) | `SimpleMachine({ display: true, keyboard: true })` |
+| … and a speaker | `SimpleMachine({ …, sound: true })` |
 | Your own memory-mapped hardware (sensors, motors, displays), as HackCode's robot does | `DeviceMachine` + your `Device` classes (+ `DL11` / `KW11L` if wanted) |
 | Your own memory map, protection, or timing model | `Cpu` with your own `Bus` |
 | Turn source into bytes, a listing, line numbers | `assemble` |
@@ -305,6 +307,7 @@ mode rules are the /45 model's, without its memory management: protect memory yo
 refusing writes in `bus.write`. The [display](#display) is a teaching device DEC never made:
 its registers, vector and behaviour are ours (it borrows DEC's CSR bits). So is the
 [keyboard](#keyboard): DEC's terminals sent only characters, with no key-up and no "key held".
+And the [sound](#sound) device: the PDP-11 had no speaker.
 
 **Hosting the CPU yourself** (your own `Bus`):
 - Give `run` a budget per step of your program (a frame, a tick) and subtract
@@ -334,6 +337,7 @@ its registers, vector and behaviour are ours (it borrows DEC's CSR bits). So is 
 | `read(addr, byte)` / `write(addr, value, byte)` | the bus, for the host too. Reading a device register has its side effects (e.g. RBUF clears DONE) |
 | `reset()` | the `RESET` instruction: every `device.reset(false)` |
 | `cpu`, `ram` (`Uint8Array`), `cycles`, `instructions` | totals since `boot` (writable) |
+| `now` | the cycle of the bus access in progress: `cycles`, plus, inside `run` or `step`, the cycles the CPU has spent so far (`cpu.elapsed`). Between runs it equals `cycles`. `advance` only reports time at the end of a run slice; `now` is exact to the cycle |
 
 **`Device` interface.** Offsets are relative to `base`.
 
@@ -342,7 +346,7 @@ its registers, vector and behaviour are ours (it borrows DEC's CSR bits). So is 
 | `base`, `size` | yes | first bus address and size in bytes, both even, inside the I/O page in practice |
 | `read(offset)` | yes | the word at an even offset, or `BUS_ERROR` for a hole. Byte reads get the same call and the bus takes the half (Unibus style), so read side effects happen for byte reads too |
 | `write(offset, value, byte)` | yes | a word, or one byte (`value` 0–255; an odd offset is the high byte). Return false for "nothing here" (trap to 4). Real DEC registers ignore writes to their high byte: do the same unless you mean otherwise |
-| `attach(cpu)` | no | keep the CPU to call `cpu.interrupt(vector, level)` |
+| `attach(cpu, clock?)` | no | keep the CPU to call `cpu.interrupt(vector, level)`. A `DeviceMachine` also passes `clock`: call it in `read` / `write` for the exact cycle of the access (`now`) |
 | `reset(powerUp)` | no | `false`: the `RESET` instruction; `true`: power-up at `boot` |
 | `advance(cycles)` | no | time passed; may be many cycles at once (a long `WAIT`) |
 | `nextEvent()` | no | cycles until the device changes by itself (flag set, interrupt). `run` stops the CPU there so polling programs see it on time. Infinity = never |
@@ -416,7 +420,8 @@ register addresses and vectors (`DEV.XBUF`, `DEV.VEC_CLOCK`, …). You can `add`
 devices. With `display: true` (or `DisplayOptions`) it also has a [`Display`](#display) in
 `display`: RAM then ends at the pixel memory (`memory` defaults to `120000`), and the clock
 ticks once a frame (`clockCycles` defaults to `frameCycles`). With `keyboard: true` (or
-`KeyboardOptions`) it also has a [`Keyboard`](#keyboard) in `keyboard`.
+`KeyboardOptions`) it also has a [`Keyboard`](#keyboard) in `keyboard`, and with `sound: true` (or
+`SoundOptions`) a [`Sound`](#sound) device in `sound`.
 
 ## Display
 
@@ -487,7 +492,7 @@ Typed text stays the console's job (`DL11`): the keyboard tells *which key*, not
   events were lost, cleared by writing it as 0) and `KBDBUF`, the oldest event: the code, plus
   `200` for a release. Reading `KBDBUF` takes the event (0 when empty), and the next one comes up.
   The queue holds 16 events. With `IE` it interrupts at vector `330`, level 4, while an event waits.
-  `176704`–`176777` is a hole (bus error).
+  `176704`–`176737` is a hole (bus error).
 - **Time:** live input (`press`, `release`) takes effect at once, between runs. `at(cycle, key,
   down)` schedules it: it takes effect at the first instruction boundary at or after `cycle`.
   `log` lists every event that took effect with its cycle, so scheduling it again with `at`
@@ -522,6 +527,48 @@ const log = m.keyboard!.log;                       // [{ cycle: 500 or a little 
 `RESET` clears only `IE`; `boot` lets every key go and forgets the queue, the log and scheduled
 input (schedule a replay after `boot`). A key held during `boot` reads as up until it is
 pressed again.
+
+## Sound
+
+A one-bit speaker (DEC never made this device; it is listed above as a departure). The full
+design is [`BLUE11_SOUND.md`](https://github.com/bluedragon-ctrl/Blue11/blob/main/docs/BLUE11_SOUND.md).
+The device makes no sound itself: it records **edges**, the cycles at which the speaker moved,
+and the host plays them.
+
+- **`SNDCS`** at `176740`: bit 0 is the speaker (1 out, 0 in), the *beeper*. Only that bit is
+  kept, so `XOR`, `INC` and `COM` switch it. The pitch is the program's own timing: at
+  1 200 000 cycles a second, switching every 1364 cycles plays an A (440 Hz).
+- **`SNDDIV`** at `176742`: a half period in cycles. Not 0, the *tone generator* switches the
+  speaker every `SNDDIV` cycles by itself and `SNDCS` is ignored; 0 stops it. A new value
+  takes effect at the next switch, so notes change without a click. There is no interrupt.
+- **Exact timing:** an edge has the cycle of the bus write that made it (`DeviceMachine.now`),
+  so the beeper's pitch is the same however the host slices a run. `176744`–`176777` is a hole.
+
+```ts
+const m = new SimpleMachine({ sound: true });          // SNDCS at 176740, SNDDIV at 176742
+m.boot(must(assemble(`
+        MOV  #176740, R2    ; SNDCS
+        MOV  #1, R1
+TONE:   XOR  R1, (R2)       ; 3 cycles: switch the speaker
+        MOV  #1358., R0     ; 2
+1$:     SOB  R0, 1$         ; 1358.
+        BR   TONE           ; 1: 1364 cycles a half period
+`)));
+m.run(20_000);                                         // a frame
+const chunk = m.sound!.take();                         // { from: 0, to, level: 0, edges, dropped: 0 }
+const half = chunk.edges[1].cycle - chunk.edges[0].cycle;  // 1364
+```
+
+| Member | |
+| :--- | :--- |
+| `new Sound({ base?, maxEdges? })` | defaults `176740`, 65536. Throws on a bad option. A `Device`: `add` it |
+| `take()` | `{ from, to, level, edges, dropped }`: the speaker from cycle `from` (at `level`) to `to` (now), every edge `{ cycle, level }` in between, and the edges dropped. The next take starts at `to` |
+| `level` | the speaker now: 1 out, 0 in |
+| `state()`, `load(state)` | the device as plain data, waiting edges included |
+
+Take the edges after each frame. A host that never does (it has no speaker) keeps only the
+last `maxEdges`; `from` then moves on past the dropped ones. `RESET` silences: the generator
+stops and the speaker goes in. `boot` clears everything.
 
 ## Host recipes
 

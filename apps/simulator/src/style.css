@@ -62,6 +62,8 @@ main > .code { display: flex; flex-direction: column; height: calc(100vh - 5.5re
 .focus-label { color: var(--accent); font-size: 0.8rem; text-shadow: 0 0 6px var(--accent); }
 .focus-label[hidden] { display: none; }
 .screen-info { opacity: 0.75; white-space: pre-wrap; text-align: center; }
+.wave { width: 100%; height: auto; background: #000; border: 1px solid var(--line); border-radius: 4px; }
+.volume input { width: 5rem; vertical-align: middle; }
 .mv-box { background: #000; border: 1px solid var(--line); padding: 0.35rem 0.5rem; white-space: pre; overflow-x: auto; }
 .mv-listing { max-height: calc(100vh - 26rem); min-height: 12rem; overflow: auto; padding: 0.25rem 0; }
 .mv-listing .lrow { padding: 0 0.5rem; white-space: pre; }

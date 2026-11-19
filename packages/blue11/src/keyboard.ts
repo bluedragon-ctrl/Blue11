@@ -70,7 +70,7 @@ export interface KeyEvent {
 }
 
 export interface KeyboardOptions {
-  /** KBDCS and KBDBUF, then a hole to +077. Default 176700. */
+  /** KBDCS and KBDBUF, then a hole to +037. Default 176700. */
   base?: number;
   /** The key map (200 bytes). Default 177000. */
   map?: number;
@@ -100,7 +100,7 @@ export interface KeyboardState {
 /** The modifiers with a left and a right key. */
 const SIDES = new Set(['ShiftLeft', 'ShiftRight', 'ControlLeft', 'ControlRight', 'AltLeft', 'AltRight']);
 
-const REGS = 0o100;
+const REGS = 0o40;
 const MAP = 0o200;
 const OVR = 0o100000;
 const DOWN = 0o200;
@@ -112,7 +112,7 @@ export class Keyboard {
   readonly level: number;
   readonly queueSize: number;
 
-  /** KBDCS, KBDBUF and the hole up to +077, a `Device` (plug it in with `machine.add`). */
+  /** KBDCS, KBDBUF and the hole up to +037, a `Device` (plug it in with `machine.add`). */
   readonly registers: Device;
   /** The key map, a `Device`: one byte per key code, 200 while the key is down. */
   readonly map: Device;
@@ -273,7 +273,7 @@ export class Keyboard {
 
   private readReg(offset: number): number {
     if (offset === 0) return this.csr | (this.queue.length ? CSR.DONE : 0);
-    if (offset !== 2) return BUS_ERROR; // the hole 176704–176776
+    if (offset !== 2) return BUS_ERROR; // the hole 176704–176736
     const v = this.queue.shift() ?? 0;
     if (!this.queue.length) this.cpu?.cancelInterrupt(this.vector);
     else if (this.csr & CSR.IE) this.cpu?.interrupt(this.vector, this.level);

@@ -1,12 +1,14 @@
 /**
  * Example programs for a `SimpleMachine` (DL11 console, KW11-L clock, and for
- * `DISPLAY_EXAMPLES` the display, for `KEYBOARD_EXAMPLES` the keyboard and display). The
+ * `DISPLAY_EXAMPLES` the display, for `KEYBOARD_EXAMPLES` the keyboard and display, for
+ * `SOUND_EXAMPLES` the sound device and display, with the line clock at 60 Hz). The
  * standalone simulator (docs/ROADMAP.md) shows them; test/examples.test.ts runs each one
  * and checks it prints `expect`, test/display.test.ts checks the frames the display
- * examples draw, and test/keyboard.test.ts drives the keyboard examples with scheduled keys.
+ * examples draw, test/keyboard.test.ts drives the keyboard examples with scheduled keys, and
+ * test/sound.test.ts checks the edges the sound examples make.
  */
 
-import { DEV, DSP, KBD, KEY, PSW_ADDRESS, type Beam } from '../src/index.js';
+import { DEV, DSP, KBD, KEY, PSW_ADDRESS, SND, type Beam } from '../src/index.js';
 
 /** The simulator's names for key codes (docs/BLUE11_KEYBOARD.md §3); letters and digits need none (`'A`). */
 export const KEY_SYMBOLS: Record<string, number> = {
@@ -15,11 +17,12 @@ export const KEY_SYMBOLS: Record<string, number> = {
   'K.TAB': KEY.TAB, 'K.ENT': KEY.ENTER, 'K.ESC': KEY.ESC, 'K.SPC': KEY.SPACE, 'K.DEL': KEY.DELETE,
 };
 
-/** Device register names the examples use (DL11 console, KW11-L clock, display, keyboard). */
+/** Device register names the examples use (DL11 console, KW11-L clock, display, keyboard, sound). */
 export const SIM_SYMBOLS: Record<string, number> = {
   RCSR: DEV.RCSR, RBUF: DEV.RBUF, XCSR: DEV.XCSR, XBUF: DEV.XBUF, LKS: DEV.LKS, PSW: PSW_ADDRESS,
   SCREEN: DSP.SCREEN, DSPCS: DSP.DSPCS, DSPFRM: DSP.DSPFRM, DSPLIN: DSP.DSPLIN, DSPPAL: DSP.DSPPAL, DSPVEC: DSP.VEC,
   KBDCS: KBD.KBDCS, KBDBUF: KBD.KBDBUF, KBDKEY: KBD.KBDKEY, KBDVEC: KBD.VEC,
+  SNDCS: SND.SNDCS, SNDDIV: SND.SNDDIV,
   ...KEY_SYMBOLS,
 };
 
@@ -761,6 +764,149 @@ TQUEUE: .ASCIZ /, QUEUE /       ;
         .EVEN                   ; code must start at an even address
 ${PUTS}
 ${PUTC}
+${VSYNC}
+`,
+  },
+];
+
+// -------------------------------------------------------------------- sound
+
+/**
+ * A sound example: it runs on a SimpleMachine with the sound device and the display, the line
+ * clock ticking once a frame (60 a second at 1 200 000 cycles a second).
+ */
+export interface SoundExample {
+  name: string;
+  source: string;
+}
+
+/** Half periods in cycles (1 200 000 / 2f) of the C major scale from middle C. */
+export const SCALE = [2293, 2043, 1820, 1718, 1531, 1364, 1215, 1147];
+
+export const SOUND_EXAMPLES: SoundExample[] = [
+  {
+    name: 'A beeper note (counting cycles)',
+    source: `
+; An A (440 Hz) for one second, with the beeper: the program switches the
+; speaker every 1364 cycles by itself. Count the cycles of one pass:
+; 3 + 2 + 1358 + 1 = 1364. Try: change 1358. and hear the note move.
+        MOV  #SNDCS, R2         ; the register, in a register: cheaper to reach
+        MOV  #1, R1             ; the bit to switch
+        MOV  #880., R3          ; 880. half periods: one second
+TONE:   XOR  R1, (R2)           ; 3 cycles: switch the speaker (it moves on the write)
+        MOV  #1358., R0         ; 2 cycles
+1$:     SOB  R0, 1$             ; 1 cycle, 1358. times
+        SOB  R3, TONE           ; 1 cycle: the next half period
+        HALT                    ; stop the CPU (880. switches: the speaker is in again)
+`,
+  },
+  {
+    name: 'A scale (a table of notes)',
+    source: `
+; The C major scale with the beeper, each note for a quarter of a second.
+; The table holds each note's delay (its half period - 5, the cycles of
+; the rest of a pass) and how many passes make a quarter of a second.
+        MOV  #SNDCS, R2         ; the speaker
+        MOV  #1, R1             ; the bit to switch
+        MOV  #NOTES, R4         ; the first note
+NOTE:   MOV  (R4)+, R5          ; its delay (0: the end of the table)
+        BEQ  DONE               ; no more notes
+        MOV  (R4)+, R3          ; its passes
+PASS:   XOR  R1, (R2)           ; 3 cycles: switch the speaker
+        MOV  R5, R0             ; 1 cycle
+1$:     SOB  R0, 1$             ; 1 cycle each: the delay
+        SOB  R3, PASS           ; 1 cycle: the next half period
+        BR   NOTE               ; the next note
+DONE:   CLR  (R2)               ; the speaker in
+        HALT                    ; stop the CPU
+NOTES:  .WORD ${SCALE.map((h) => `${h - 5}., ${Math.round(600000 / h / 2)}.`).join(', ')}, 0 ; delay, passes
+`,
+  },
+  {
+    name: 'A tune (the tone generator)',
+    source: `
+; A tune played by the tone generator, one note per clock interrupt count.
+; The CPU sleeps in WAIT the whole time: the generator keeps the pitch.
+; Each entry of TUNE is (half period, ticks); a half period of 0 is a rest,
+; and 0 ticks ends the tune. 60 ticks are a second.
+        MOV  #CLOCK, @#100      ; the line clock's handler
+        MOV  #300, @#102        ; its PSW: priority 6
+        MOV  #TUNE, R4          ; the first note
+        JSR  PC, NEXT           ; start it
+        BIS  #100, @#LKS        ; IE: an interrupt every tick
+1$:     WAIT                    ; sleep; the generator plays
+        TST  R4                 ; 0: the tune is over
+        BNE  1$                 ; not yet
+        HALT                    ; stop the CPU
+
+; CLOCK: once a tick, count the note down; at 0, the next one.
+CLOCK:  DEC  R3                 ; one tick fewer
+        BNE  1$                 ; the note goes on
+        JSR  PC, NEXT           ; the next note
+1$:     RTI                     ; back to WAIT
+
+; NEXT: start the note at R4 and step R4 past it. The end: silence, R4 = 0.
+NEXT:   MOV  (R4)+, @#SNDDIV    ; the half period (0: a rest)
+        MOV  (R4)+, R3          ; its length in ticks
+        BNE  1$                 ; a note
+        CLR  @#SNDDIV           ; the end: silence
+        CLR  R4                 ; tell the program
+1$:     RTS  PC                 ; back to the caller
+TUNE:   .WORD ${SCALE[0]}., 15., ${SCALE[2]}., 15., ${SCALE[4]}., 15., ${SCALE[7]}., 30. ; C E G C
+        .WORD 0, 10.            ; a rest
+        .WORD ${SCALE[4]}., 15., ${SCALE[7]}., 45. ; G C
+        .WORD 0, 0              ; the end
+`,
+  },
+  {
+    name: 'Play and draw (beeper or generator)',
+    source: `
+; Draw a triangle over and over while an A plays. First the beeper: the
+; drawing between two switches takes longer with every row, so the note
+; slides down, again and again. Then the tone generator: the same drawing,
+; and the note stays in tune. About a second each.
+        MOV  #SNDCS, R2         ; the speaker
+        MOV  #1, R1             ; the bit to switch
+        MOV  #27., -(SP)        ; 27. triangles: about a second
+BEEP:   MOV  #SCREEN, R5        ; the triangle's first row
+        MOV  #1, R3             ; it is 1 pixel long
+1$:     XOR  R1, (R2)           ; switch the speaker, by hand
+        JSR  PC, ROW            ; draw R3 pixels at R5 (more cycles each row)
+        MOV  #1300., R0         ; then wait, as for a note
+2$:     SOB  R0, 2$             ;
+        INC  R3                 ; the next row is a pixel longer
+        CMP  R3, #41            ; 40 rows done?
+        BNE  1$                 ; not yet
+        DEC  (SP)               ; one triangle fewer
+        BNE  BEEP               ; draw it again
+        CLR  (R2)               ; the speaker in
+        MOV  #1364., @#SNDDIV   ; now the generator plays the A
+        MOV  #60., (SP)         ; 60. ticks: a second
+        CLR  @#LKS              ; forget a tick seen before
+GEN:    MOV  #SCREEN+4000, R5   ; another triangle, lower down
+        MOV  #1, R3             ; its first row
+3$:     JSR  PC, ROW            ; draw it, as fast as the CPU can
+        INC  R3                 ; the next row
+        CMP  R3, #41            ; 40 rows done?
+        BNE  3$                 ; not yet
+        TSTB @#LKS              ; DONE: did the clock tick?
+        BPL  GEN                ; no: draw it again
+        CLR  @#LKS              ; clear DONE
+        DEC  (SP)               ; one tick fewer
+        BNE  GEN                ; draw it again until a second has passed
+        CLR  @#SNDDIV           ; silence
+        TST  (SP)+              ; drop the count
+        JSR  PC, VSYNC          ; let the last frame be shown
+        HALT                    ; stop the CPU
+
+; ROW: draw R3 pixels from R5, then move R5 one row down.
+ROW:    MOV  R5, R4             ; the first pixel
+        MOV  R3, R0             ; the length
+1$:     MOVB R3, (R4)+          ; a pixel, its colour from the row
+        SOB  R0, 1$             ; the next pixel
+        ADD  #100, R5           ; the next row
+        RTS  PC                 ; back to the caller
+
 ${VSYNC}
 `,
   },

@@ -3,7 +3,7 @@
 `packages/blue11/` is a **standalone, reusable library**: CPU, assembler (a subset of the original syntax),
 disassembler, device bus, published to npm as `blue11`. Its users (HackCode, the simulator) are
 hosts, not owners.
-User documentation: [`README.md`](README.md). Design and rationale: `../../docs/BLUE11_MACHINE.md` (§9: the library boundary); specified devices: `../../docs/BLUE11_DISPLAY.md`, `../../docs/BLUE11_KEYBOARD.md`.
+User documentation: [`README.md`](README.md). Design and rationale: `../../docs/BLUE11_MACHINE.md` (§9: the library boundary); specified devices: `../../docs/BLUE11_DISPLAY.md`, `../../docs/BLUE11_KEYBOARD.md`, `../../docs/BLUE11_SOUND.md`.
 
 ## Rules (the first three are enforced by `test/boundary.test.ts`)
 
@@ -45,9 +45,10 @@ Sources are in `src/`, tests in `test/`.
 | :--- | :--- | :--- |
 | An instruction | `isa.ts` (name, opcode, format), `cpu.ts` (`exec`), `disassembler.ts` for a new format | `cpu.test.ts`; `assembler.test.ts` assembles and disassembles every table entry |
 | Assembler syntax, directives, warnings | `assembler.ts` | `assembler.test.ts`, `syntax.test.ts` (compatibility claims), `syntax-warnings.test.ts` (implicit `.WORD`, warnings) |
-| Bus, devices, time, `WAIT` | `devices.ts` (`DeviceMachine`, `DL11`, `KW11L`, `Rom`) | `devices.test.ts`, `cpu.test.ts` (interrupts) |
+| Bus, devices, time (`now`), `WAIT` | `devices.ts` (`DeviceMachine`, `DL11`, `KW11L`, `Rom`) | `devices.test.ts`, `cpu.test.ts` (interrupts) |
 | The display | `display.ts` (`Display`, `frameToRgba`) | `display.test.ts` (also the `DISPLAY_EXAMPLES`) |
 | The keyboard | `keyboard.ts` (`Keyboard`, `keyCode`) | `keyboard.test.ts` (also the `KEYBOARD_EXAMPLES`) |
+| Sound | `sound.ts` (`Sound`) | `sound.test.ts` (also the `SOUND_EXAMPLES`) |
 | `SimpleMachine` | `machine.ts` | `examples.test.ts` (the programs in `examples/examples.ts`), `readme-examples.test.ts` |
 | Syntax highlighting | `codemirror.ts` | – |
 | Public API | `index.ts` | `boundary.test.ts` |

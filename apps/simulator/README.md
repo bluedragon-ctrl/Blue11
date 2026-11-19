@@ -22,6 +22,13 @@ deployed to GitHub Pages from `main`: **[bluedragon-ctrl.github.io/Blue11](https
   (`Simulator.screenNow`), as a real monitor goes on refreshing while the CPU is halted.
   Otherwise a program that halts within its first frame would leave the screen black.
 - **Console** (the DL11 terminal), below the tabs, so it stays in view with each of them.
+- **Sound** (on unless turned off, with its volume, kept in the browser): the speaker
+  (`SNDCS`, `SNDDIV`, [sound spec](../../docs/BLUE11_SOUND.md)) played with Web Audio. It plays
+  only at 60 frames/s, real time, and is silent at other speeds, while paused and while
+  stepping, so a note is never heard at the wrong pitch. The **Sound** tab draws the speaker over
+  the last frame against a ruler in cycles, with the last half period it measured. A program
+  that prints BEL (7) on the console rings a bell. The edges become samples in `src/audio.ts`
+  (no DOM, tested); `src/speaker.ts` queues them a little ahead of the audio clock.
 - **Retro** (on unless turned off, kept in the browser): the machine's own views in the look of
   the period. The screen is a CRT in its bezel, with one faint scanline per row the display
   draws; the Listing and ROM are printed on green-bar fan-fold paper; the console is an amber

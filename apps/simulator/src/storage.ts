@@ -15,6 +15,8 @@ export interface KeyValue {
 const CURRENT = 'blue11.sim.current';
 const SAVED = 'blue11.sim.programs';
 const RETRO = 'blue11.sim.retro';
+const SOUND = 'blue11.sim.sound';
+const VOLUME = 'blue11.sim.volume';
 
 export class Library {
   constructor(private readonly store: KeyValue | null) {}
@@ -34,6 +36,17 @@ export class Library {
   /** The period look (CRT screen, printed listings, amber console): on unless turned off. */
   get retro(): boolean { return this.read(RETRO) !== 'off'; }
   set retro(on: boolean) { this.write(RETRO, on ? 'on' : 'off'); }
+
+  /** The speaker: on unless muted. */
+  get sound(): boolean { return this.read(SOUND) !== 'off'; }
+  set sound(on: boolean) { this.write(SOUND, on ? 'on' : 'off'); }
+
+  /** The speaker's volume, 0–100 (default 25). */
+  get volume(): number {
+    const v = Number(this.read(VOLUME) ?? 25);
+    return Number.isFinite(v) ? Math.min(100, Math.max(0, Math.round(v))) : 25;
+  }
+  set volume(v: number) { this.write(VOLUME, String(v)); }
 
   save(name: string, source: string): void { this.write(SAVED, JSON.stringify({ ...this.saved, [name]: source })); }
 

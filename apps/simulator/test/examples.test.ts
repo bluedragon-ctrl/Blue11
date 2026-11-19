@@ -34,7 +34,7 @@ const byName = (name: string) => PROGRAMS.find((p) => p.name.startsWith(name))!;
 
 describe('the examples menu', () => {
   it('holds every example of the library and the ROM showcase, with unique ids', () => {
-    expect(PROGRAMS.length).toBe(8 + 7 + 6 + 4 + 3);
+    expect(PROGRAMS.length).toBe(8 + 7 + 6 + 4 + 4 + 3);
     expect(new Set(PROGRAMS.map((p) => p.id)).size).toBe(PROGRAMS.length);
   });
 
@@ -72,6 +72,25 @@ describe('display examples draw the frames the library does', () => {
       expect(f.palette).toEqual(want[i].palette);
     });
     expect(frames.at(-1)!.pixels.some((x) => x)).toBe(true);
+  });
+});
+
+describe('sound examples make the edges the library does', () => {
+  it.each(PROGRAMS.filter((p) => p.group === 'Sound').map((p) => [p.name, p] as const))('%s', (_n, p) => {
+    const sim = new Simulator();
+    expect(startProgram(sim, p)).toEqual([]);
+    const edges: number[] = [];
+    let stop = '';
+    for (let i = 0; i < 400 && stop !== 'halt'; i++) {
+      stop = sim.runFrame().stop;
+      edges.push(...sim.takeSound().edges.map((e) => e.cycle));
+    }
+    expect(stop).toBe('halt');
+    const m = new SimpleMachine({ display: true, sound: true });
+    m.boot(assemble(p.source, { symbols: SIM_SYMBOLS }));
+    m.run(10_000_000);
+    expect(edges).toEqual(m.sound!.take().edges.map((e) => e.cycle));
+    expect(edges.length).toBeGreaterThan(100);
   });
 });
 

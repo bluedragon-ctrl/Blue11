@@ -1,6 +1,6 @@
 /**
  * A minimal system around the CPU: RAM, a DL11 console terminal and a KW11-L line
- * clock, at their real DEC addresses and vectors, and optionally the Blue-11 display and keyboard. Used by the tests and the example
+ * clock, at their real DEC addresses and vectors, and optionally the Blue-11 display, keyboard and sound. Used by the tests and the example
  * programs (`examples/examples.ts`); a project with its own peripherals builds on {@link DeviceMachine}
  * (`devices.ts`) the same way.
  *
@@ -11,6 +11,7 @@
 import { CSR, DEV, DeviceMachine, DL11, KW11L, type DeviceMachineOptions } from './devices.js';
 import { Display, type DisplayOptions } from './display.js';
 import { Keyboard, type KeyboardOptions } from './keyboard.js';
+import { Sound, type SoundOptions } from './sound.js';
 
 export { CSR, DEV };
 
@@ -24,6 +25,8 @@ export interface MachineOptions extends DeviceMachineOptions {
   display?: boolean | DisplayOptions;
   /** Add a {@link Keyboard} (`true`: the defaults, 176700 and the key map at 177000). */
   keyboard?: boolean | KeyboardOptions;
+  /** Add a {@link Sound} device (`true`: the defaults, at 176740). */
+  sound?: boolean | SoundOptions;
 }
 
 export class SimpleMachine extends DeviceMachine {
@@ -34,6 +37,8 @@ export class SimpleMachine extends DeviceMachine {
   readonly display: Display | null;
   /** The keyboard, if the `keyboard` option asked for one. */
   readonly keyboard: Keyboard | null;
+  /** The sound device, if the `sound` option asked for one. */
+  readonly sound: Sound | null;
 
   constructor(opts: MachineOptions = {}) {
     const display = opts.display ? new Display(opts.display === true ? {} : opts.display) : null;
@@ -46,6 +51,8 @@ export class SimpleMachine extends DeviceMachine {
     if (display) this.add(display.memory).add(display.control);
     this.keyboard = opts.keyboard ? new Keyboard(opts.keyboard === true ? {} : opts.keyboard) : null;
     if (this.keyboard) this.add(this.keyboard.registers).add(this.keyboard.map);
+    this.sound = opts.sound ? new Sound(opts.sound === true ? {} : opts.sound) : null;
+    if (this.sound) this.add(this.sound);
   }
 
   /** Everything written to the console (XBUF). */

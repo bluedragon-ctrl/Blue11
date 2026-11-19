@@ -8,7 +8,7 @@ README as a departure from the original machine.
 
 - **The machine:** the CPU, assembler, disassembler, the device bus, DEC's console (DL11) and
   line clock (KW11-L). They were built in HackCode. Design: [`BLUE11_MACHINE.md`](BLUE11_MACHINE.md).
-- **Two device specs**, both decided on 2026-11-18:
+- **Device specs**, all decided on 2026-11-18 (the sound's in step 10):
   - The display, [`BLUE11_DISPLAY.md`](BLUE11_DISPLAY.md). Mode 0 is 64 × 64 with a byte per
     pixel; mode 1 is 128 × 128 with 4 bits per pixel. It has 16 colours from an RGB 3-3-3
     palette, a vertical-blank flag and interrupt, and an optional scanning beam that tears.
@@ -70,29 +70,35 @@ README as a departure from the original machine.
 9. ~~**Stepping through `WAIT`.**~~ (done, 2026-11-18, `blue11` 0.7.0): a step on a sleeping
    CPU advances the devices to the next event that can wake it (at most `maxCycles`), as `run`
    does, and takes the interrupt.
-10. **Assembler messages for sizes.** Name the symbol and its line whenever a size depends on
+10. ~~**Sound: a one-bit speaker**~~ (done, 2026-11-18, `blue11` 0.8.0,
+    [`BLUE11_SOUND.md`](BLUE11_SOUND.md)): the `Sound` device (a beeper bit and a tone
+    generator, edges recorded at the cycle of each write through the new `DeviceMachine.now`),
+    its tests and four examples, a README section and the departure listed; in the simulator,
+    the speaker played with Web Audio at real time only, volume and mute, a Sound tab with the
+    last frame's waveform, the console's bell, and a help page.
+11. **Assembler messages for sizes.** Name the symbol and its line whenever a size depends on
     a later definition (the 0.4.0 fixes cover `.BLKW`, `. =` and register symbols; check every
     other place where pass 1 and pass 2 can disagree, and make "moved between passes" a
     message that should never be seen).
-11. **Conditional assembly and repetition:** `.IF` / `.IFF` / `.IFT` / `.ENDC` with `EQ NE GT
+12. **Conditional assembly and repetition:** `.IF` / `.IFF` / `.IFT` / `.ENDC` with `EQ NE GT
     LT GE LE DF NDF`, `.IIF`, and `.REPT` / `.ENDR`. Small, self-contained, and they let the
     ROM and the examples drop copy-pasted tables.
-12. **Macros:** `.MACRO` / `.ENDM` with arguments, default values and `.NARG`, then `.IRP` /
+13. **Macros:** `.MACRO` / `.ENDM` with arguments, default values and `.NARG`, then `.IRP` /
     `.IRPC`. The largest gap from the original assembler; listings show expansions as the
     original does. Needs a design note in `BLUE11_MACHINE.md` §3 first (what of `.MCALL` the
     predefined symbols replace).
-13. **More of the /40 and its successors' instructions**, each as an option like `eis`: `SPL`
+14. **More of the /40 and its successors' instructions**, each as an option like `eis`: `SPL`
     and `MTPS` / `MFPS` (a priority change that works under `protectModes`), and `MARK`.
-14. **`.INCLUDE`** through a host callback (`options.include(name) → source`), so the
+15. **`.INCLUDE`** through a host callback (`options.include(name) → source`), so the
     simulator's ROM routines and a host's library can be shared without pasting. The library
     stays free of file I/O.
-15. **A differential test against SIMH:** random instruction sequences, compared register by
+16. **A differential test against SIMH:** random instruction sequences, compared register by
     register and flag by flag with traces from SIMH's /40 model (with EIS), checked in as
     fixtures. It pins down the corners: `ASH` / `ASHC` overflow, `DIV` overflow, `SBC` / `ADC`
     flags, the order of side effects in `JSR R, @(R)+` and `MOV R, (R)+`.
-16. **Documented restart rules for hosts:** when `onTrap` stops on a fault, the PC is set back
+17. **Documented restart rules for hosts:** when `onTrap` stops on a fault, the PC is set back
     but autoincrement and autodecrement have already happened. Say so in the README, and
     consider an option to undo them (the /45's `SSR1` records exactly this).
-17. **Later, if wanted:** a third display mode (such as 128 × 128 at 1 bpp), a mouse, more keys,
+18. **Later, if wanted:** a third display mode (such as 128 × 128 at 1 bpp), a mouse, more keys,
    and a shared UI package for the debugger panels HackCode and the simulator have in common
    (extracted only once both exist).

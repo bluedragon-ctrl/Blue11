@@ -1,6 +1,6 @@
 {
   "name": "blue11",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "description": "A PDP-11-style 16-bit CPU, assembler (a subset of MACRO-11), disassembler and memory-mapped devices, for teaching. Deterministic, no dependencies.",
   "license": "MIT",
   "type": "module",

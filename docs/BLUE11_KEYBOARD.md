@@ -113,7 +113,7 @@ LOOP:   JSR  PC, VSYNC              ; once a frame (BLUE11_DISPLAY.md §4)
 | :--- | :--- | :--- | :--- |
 | `176700` | `KBDCS` | read / write | control and status |
 | `176702` | `KBDBUF` | read only | the oldest event |
-| `176704`–`176777` | | | hole: bus error (trap 4) |
+| `176704`–`176737` | | | hole: bus error (trap 4) |
 
 **`KBDCS`**
 
@@ -243,7 +243,8 @@ keyCode('KeyA');                           // 0o101: a browser KeyboardEvent.cod
 | Addresses | What |
 | :--- | :--- |
 | `176700`–`176703` | `KBDCS`, `KBDBUF` |
-| `176704`–`176777` | hole: bus error |
+| `176704`–`176737` | hole: bus error |
+| `176740`–`176777` | the sound device ([`BLUE11_SOUND.md`](BLUE11_SOUND.md)) |
 | `177000`–`177177` | `KBDKEY`: the key map |
 | vector `330` | keyboard |
 
