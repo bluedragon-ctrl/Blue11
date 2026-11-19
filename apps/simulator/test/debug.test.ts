@@ -2,7 +2,8 @@ import { assemble } from 'blue11';
 import { describe, expect, it } from 'vitest';
 import { octal } from 'blue11';
 import {
-  addressNamer, charOf, disassemblyAround, explorerInstructions, explorerRows, lineHeat, memoryLayout, memoryRows, memorySnapshot, parseAddress, peek,
+  addressNamer, charOf, disassemblyAround, explorerInstructions, explorerRows, lineHeat, MAP_COLOURS, MAP_COLS, MAP_ROWS, mapAddress,
+  mapCell, memoryLayout, memoryMapRgba, memoryRows, memorySnapshot, parseAddress, peek,
   regionOf, registerText, stackRows, vectorName,
 } from '../src/debug';
 import { romAssembly } from '../src/rom';
@@ -133,5 +134,33 @@ STK:                      ; 1076`);
       ['001010', undefined, 'JSR PC, SUB', 'code'],
     ]);
     expect(explorerInstructions(read, l, 0o1030, 1)[0]).toMatchObject({ words: [1], text: 'WAIT', role: 'data' });
+  });
+
+  it('maps all 64 KB, a dot per word, 1000 bytes a row', () => {
+    expect([MAP_COLS * MAP_ROWS * 2, mapAddress(0, 1), mapAddress(MAP_COLS - 1, MAP_ROWS - 1)]).toEqual([0o200000, 0o1000, 0o177776]);
+    expect([mapCell(0o1030), mapCell(0o120000), mapCell(0o177777)]).toEqual([{ x: 0o14, y: 1 }, { x: 0, y: 0o120 }, { x: 0o377, y: 0o177 }]);
+    for (const a of [0, 0o1030, 0o157776, 0o177776]) { const c = mapCell(a); expect(mapAddress(c.x, c.y)).toBe(a); }
+
+    const l = memoryLayout(prog, romAssembly(), s.cpu.r[6], s.stackTop);
+    const words = memorySnapshot(read);
+    const before = Int32Array.from(words);
+    before[0o1030 >> 1] = 0; // COUNT was 0
+    const px = new Uint8ClampedArray(MAP_COLS * MAP_ROWS * 4);
+    memoryMapRgba(words, l, px, { heat: s.heat, before });
+    const at = (a: number) => Array.from(px.subarray(2 * a, 2 * a + 3)); // 4 bytes a dot, a dot per 2 bytes
+    expect(at(0o1030)).toEqual([...MAP_COLOURS.changed]); // COUNT, changed
+    expect(at(0o1032)).toEqual([...MAP_COLOURS.data]); // MSG, not 0
+    expect(at(0o1036)).toEqual(MAP_COLOURS.data.map((c) => Math.round(c * 0.55))); // a 0 in .BLKW: dim
+    expect(at(0o1072)).toEqual([...MAP_COLOURS.stack]);
+    expect(at(0o2000)).toEqual(MAP_COLOURS.ram.map((c) => Math.round(c * 0.3))); // free RAM, 0
+    expect(at(0o170000)).toEqual([...MAP_COLOURS.none]); // nothing answers
+    expect(at(0o177564)).toEqual([...MAP_COLOURS.io]); // XCSR: ready
+    // run once: towards white; never run (RTS PC, after the BPT): the plain colour
+    expect(s.heat[0o1000 >> 1]).toBe(1);
+    expect(at(0o1000).every((c, i) => c > MAP_COLOURS.code[i] || c === 255)).toBe(true);
+    expect(at(0o1026)).toEqual([...MAP_COLOURS.code]);
+    expect(at(0o1014)).toEqual(MAP_COLOURS.code.map((c) => Math.round(c * 0.55))); // HALT is 000000
+    expect(at(0o1002)).toEqual([...MAP_COLOURS.operand]);
+    expect(px[3]).toBe(255);
   });
 });

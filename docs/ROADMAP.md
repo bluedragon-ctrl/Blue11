@@ -91,8 +91,11 @@ README as a departure from the original machine.
        side panel used to read them, and took the character). The stack starts at the highest
        SP since the boot, so a program that sets SP itself (`MOV #STK, SP`) shows its stack (it
        was a guess: the origin, or `1000`).
-    2. A **map of the whole 64 KB**, a cell per word, coloured by region and role, with the PC,
-       SP and the heat; a click opens the tab there.
+    2. ~~A **map of the whole 64 KB**~~ (done, 2026-11-19): above the rows, a dot per word,
+       1000₈ bytes a row, coloured by role or region (dim for 0, black where nothing answers),
+       red for what the last command changed, whiter the more often a word ran; squares for the
+       PC and SP and a frame for the rows shown. Pointing tells what is there; a click shows it
+       in the rows. About 1.5 ms per animation frame while running.
     3. **Pixels and addresses:** hovering a pixel on the screen shows its address (`12YYXX`), and
        a click opens the tab at that byte (and nibble in mode 1).
     4. **Accesses and watchpoints:** read / write heat per word and "stop when this word is

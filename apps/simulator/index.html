@@ -87,14 +87,20 @@
             </select>
             <button id="mx-prev" class="small secondary" title="1000 bytes back (or the mouse wheel)">▲</button>
             <button id="mx-next" class="small secondary" title="1000 bytes on (or the mouse wheel)">▼</button>
+            <label class="mx-check" title="The map of all 64 KB, a dot per word"><input id="mx-show-map" type="checkbox" checked> map</label>
           </div>
+          <div class="mx-map" id="mx-map-box">
+            <canvas id="mx-map" width="512" height="256" title="All 64 KB, a dot per word: 1000 bytes a row. Click: show that word below"></canvas>
+            <div class="mx-map-axis"><span>000000<br>vectors<br>RAM</span><span>120000<br>pixels</span><span>160000 ROM</span><span>170000 I/O</span></div>
+          </div>
+          <div id="mx-map-at" class="mx-map-at">Point at the map: the address and what is there. Click: show it below.</div>
           <div id="mx-where" class="mv-note"></div>
           <div id="mx-rows" class="mv-box mx-rows"></div>
           <div id="mx-detail" class="mx-detail"></div>
           <div class="mx-legend">
             <span class="w code">instruction</span><span class="w operand">operand</span><span class="w data">data</span><span class="w stack">stack</span>
             <span class="w ram">RAM</span><span class="w vectors">vector</span><span class="w pixels">pixels</span><span class="w rom">ROM</span><span class="w io">device</span>
-            <span class="w pc">PC</span><span class="w sp">SP</span><span class="w changed">changed</span><span class="w named">label</span>
+            <span class="w pc">PC</span><span class="w sp">SP</span><span class="w changed">changed</span><span class="w named">label</span><span class="w hot">run (map: whiter)</span>
           </div>
         </div>
         <div class="console">

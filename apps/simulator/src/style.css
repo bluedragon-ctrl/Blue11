@@ -74,7 +74,15 @@ main > .code { display: flex; flex-direction: column; height: calc(100vh - 5.5re
 #mx-addr { width: 9rem; background: #000; color: var(--fg); border: 1px solid var(--line); font: inherit; font-size: 0.8rem; padding: 0 0.3rem; }
 #mx-addr.bad { border-color: var(--warn); }
 #mx-as { font: inherit; font-size: 0.8rem; background: #000; color: var(--fg); border: 1px solid var(--line); }
+.mx-map { display: flex; gap: 0.4rem; align-items: flex-start; }
+.mx-map[hidden] { display: none; }
+#mx-map { flex: 1 1 0; min-width: 0; max-width: 512px; height: auto; aspect-ratio: 2 / 1; image-rendering: pixelated; cursor: crosshair; background: #000; border: 1px solid var(--line); }
+.mx-map-axis { align-self: stretch; display: grid; grid-template-rows: 80fr 32fr 8fr 8fr; flex: none; font-size: 0.7rem; line-height: 1.1; opacity: 0.7; }
+.mx-map-axis span { border-top: 1px solid var(--line); white-space: nowrap; overflow: hidden; }
+.mx-map-at { font-family: system-ui, sans-serif; font-size: 0.78rem; opacity: 0.85; min-height: 1.3em; }
+.mx-check { font-size: 0.8rem; display: flex; align-items: center; gap: 0.2rem; }
 .mx-rows { max-height: calc(100vh - 26rem); min-height: 12rem; overflow: auto; padding: 0.25rem 0; font-size: 0.74rem; }
+.mx-map:not([hidden]) ~ .mx-rows { max-height: calc(100vh - 26rem - min(16rem, 40vw)); }
 .mx-rows .empty { white-space: normal; opacity: 0.6; font-family: system-ui, sans-serif; padding: 0 0.5rem; }
 .mrow { display: flex; gap: 0.5ch; padding: 0 0.4rem; white-space: pre; width: max-content; min-width: 100%; box-sizing: border-box; }
 .mrow .a { opacity: 0.6; margin-right: 0.5ch; }
@@ -100,6 +108,7 @@ main > .code { display: flex; flex-direction: column; height: calc(100vh - 5.5re
 .w.sp { box-shadow: -3px 0 0 #3cff3c; opacity: 1; }
 .w.changed { background: #ff4d4d55; color: #fff; opacity: 1; }
 .w.named { text-decoration: underline dotted var(--accent); text-underline-offset: 3px; }
+.w.hot { background: #ffffffcc; color: #000; }
 .w.picked, .mrow.picked { outline: 2px solid #fff; }
 .mx-detail { font-family: system-ui, sans-serif; font-size: 0.82rem; min-height: 2.6em; border-left: 3px solid var(--accent); background: #39d0ff12; padding: 0.3rem 0.6rem; }
 .mx-detail .empty { opacity: 0.6; }

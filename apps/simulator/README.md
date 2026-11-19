@@ -41,7 +41,8 @@ deployed to GitHub Pages from `main`: **[bluedragon-ctrl.github.io/Blue11](https
   device name such as `DSPCS`, or a register), **Stack**, and the **Input log**. The **Memory**
   tab shows 1000 bytes at a time as words, bytes or instructions, and what each word is
   (instruction, operand, data, stack, with its label and line), the PC and SP, and what the
-  last command changed.
+  last command changed, under a map of all 64 KB (a dot per word, coloured the same way, with
+  the heat: point at it to see a word, click it to show it in the rows).
 - **Keys.** While the screen or the console has focus ("keyboard → program"), every key goes
   to the keyboard device, and a key that types a character also goes to the console
   ([keyboard spec §7.1](../../docs/BLUE11_KEYBOARD.md)). Ctrl and Cmd shortcuts stay with the
