@@ -1,6 +1,7 @@
 /**
  * The simulator page: the editor, Run / Continue / Pause / Step, the screen on a canvas
  * with the keyboard, the speaker, the console, the registers, disassembly, memory, stack, the listing,
+ * the memory explorer,
  * the ROM, the examples and saved programs, sharing by URL, the input log, and the help.
  *
  * The machine runs whole frames paced by animation frames. The speed setting (frames per
@@ -13,7 +14,10 @@ import { EditorState } from '@codemirror/state';
 import { EditorView, keymap, lineNumbers } from '@codemirror/view';
 import { frameToRgba, keyCode, octal, type AsmError, type Frame } from 'blue11';
 import { blue11Asm, blue11Highlight } from 'blue11/codemirror';
-import { addressNamer, disassemblyAround, inRom, lineHeat, memoryRows, parseAddress, registerText, stackRows } from './debug';
+import {
+  addressNamer, charOf, disassemblyAround, explorerInstructions, explorerRows, inRom, lineHeat, memoryLayout, memoryRows,
+  memorySnapshot, parseAddress, READ_TAKES, regionOf, registerText, ROW_WORDS, stackRows, vectorName, type MemCell, type Role,
+} from './debug';
 import { breakpointLines, debugExtensions, setErrors, setHeat, setPcLine, toggleBreakpointAtCursor } from './editor';
 import { CYCLES_PER_SECOND, lastHalfPeriod, shouldPlay } from './audio';
 import { HELP, inComment, wordAt } from './help';
@@ -21,6 +25,7 @@ import { helpTooltip } from './help/tooltip';
 import { HelpView } from './help/view';
 import { FIRST, PROGRAMS, type Program } from './programs';
 import { romAssembly } from './rom';
+import { SIM_SYMBOLS } from '../../../packages/blue11/examples/examples';
 import { parseRecording, record, Simulator, type InputEvent, type StepResult } from './sim';
 import { Speaker } from './speaker';
 import { Library, shareHash, sharedProgram } from './storage';
@@ -388,6 +393,7 @@ export function startPage(): void {
     lastTime = now;
     syncBreakpoints();
     const until = performance.now() + BUDGET_MS;
+    if (view === 'memory') mark(); // running, a word is marked if this animation frame changed it
     while (owed >= 1 && running) {
       owed -= 1;
       const r = sim.runFrame(resumeNext);
@@ -419,10 +425,12 @@ export function startPage(): void {
     if (running) return;
     if (!current() || !sim.canRun) {
       if (!load()) return;
+      mark();
       showStatus(`Loaded: stopped at the first instruction, ${octal(sim.cpu.r[7])}. Step again to run it.`);
       show();
       return;
     }
+    mark();
     const r = sim.step();
     if (r.stop === 'step') showStatus(`Stepped: ${r.cycles} cycles.`);
     else if (r.stop === 'frame') showStatus('Asleep in WAIT for the whole frame: no interrupt came.');
@@ -437,6 +445,7 @@ export function startPage(): void {
   buttons.stepFrame.addEventListener('click', () => {
     if (!current()) return;
     syncBreakpoints();
+    mark();
     const r = sim.runFrame(true);
     if (r.stop === 'frame') showStatus(`Frame ${octal(sim.display.frame.number)} done.`);
     else stopped(r);
@@ -445,6 +454,7 @@ export function startPage(): void {
   buttons.restart.addEventListener('click', () => {
     pause();
     if (current()) sim.restart(); else if (!load()) return;
+    mark();
     showStatus(`Restarted: stopped at the first instruction, ${octal(sim.cpu.r[7])}.`);
     show();
   });
@@ -491,18 +501,20 @@ export function startPage(): void {
 
   // ---------------------------------------------------------------- views
 
-  type View = 'screen' | 'listing' | 'rom' | 'sound';
+  const VIEWS = ['screen', 'listing', 'rom', 'sound', 'memory'] as const;
+  type View = (typeof VIEWS)[number];
   let view: View = 'screen';
   function setView(v: View): void {
     view = v;
-    for (const k of ['screen', 'listing', 'rom', 'sound'] as const) {
+    if (v === 'memory' && !before) mark();
+    for (const k of VIEWS) {
       $(`view-${k}`).hidden = k !== v;
       $(`tab-${k}`).classList.toggle('active', k === v);
       $(`tab-${k}`).setAttribute('aria-selected', String(k === v));
     }
     show();
   }
-  for (const k of ['screen', 'listing', 'rom', 'sound'] as const) $(`tab-${k}`).addEventListener('click', () => setView(k));
+  for (const k of VIEWS) $(`tab-${k}`).addEventListener('click', () => setView(k));
 
   /** The listings: rebuilt for a new program, then only the PC's row changes. */
   const listings = {
@@ -530,6 +542,169 @@ export function startPage(): void {
       if (top < l.el.scrollTop || top > l.el.scrollTop + l.el.clientHeight - pcRow.offsetHeight) l.el.scrollTop = top - l.el.clientHeight / 3;
     }
   }
+
+  /** The ROM tab, scrolled to a line of rom.mac. */
+  function showRomLine(line: number): void {
+    setView('rom');
+    const r = listings.rom.rows.find((x) => x.line === line);
+    if (!r) return;
+    for (const x of listings.rom.rows) x.el.classList.toggle('picked', x === r);
+    listings.rom.el.scrollTop = r.el.offsetTop - listings.rom.el.offsetTop - listings.rom.el.clientHeight / 3;
+  }
+
+  /** The editor, at a line of the program. */
+  function showLine(line: number): void {
+    const l = editor.state.doc.line(Math.min(line, editor.state.doc.lines));
+    editor.dispatch({ selection: { anchor: l.from }, effects: EditorView.scrollIntoView(l.from, { y: 'center' }) });
+    editor.focus();
+  }
+
+  // ---------------------------------------------------------------- the memory explorer
+
+  /** Memory as it was when the last command started: the words it changed are marked. */
+  let before: Int32Array | null = null;
+  const peekRead = (a: number) => sim.machine.read(a, false);
+  /** Remember memory now, to show what the next command changes (only while the Memory tab is open). */
+  function mark(): void { before = view === 'memory' ? memorySnapshot(peekRead) : null; }
+  /** The bytes shown at a time: 40 rows of 20. */
+  const MX_ROWS = 0o40;
+  const mxAddr = $<HTMLInputElement>('mx-addr');
+  const mxAs = $<HTMLSelectElement>('mx-as');
+  let picked: number | null = null;
+
+  /** The first address the explorer shows: what is typed (a register follows it), else the program. */
+  function explorerStart(): number | null {
+    const prog = sim.program;
+    if (!mxAddr.value.trim()) return prog ? prog.origin : 0o1000;
+    return parseAddress(mxAddr.value, prog?.symbols ?? new Map(), sim.cpu.r);
+  }
+  function goTo(text: string): void { mxAddr.value = text; picked = null; setView('memory'); }
+  function scrollExplorer(bytes: number): void {
+    const at = explorerStart();
+    if (at === null) return;
+    mxAddr.value = octal(Math.max(0, Math.min(0o200000 - MX_ROWS * 2 * ROW_WORDS, (at & ~0o17) + bytes)));
+    show();
+  }
+
+  const ROLE_TEXT: Record<Role, string> = {
+    code: 'an instruction (its first word)', operand: 'an operand word of the instruction before it',
+    data: 'data (.WORD, .BYTE, .ASCII, .BLKW…)', stack: 'on the stack',
+  };
+
+  /** One word in words: what it is, where it came from, what it was. */
+  function cellText(c: MemCell): string {
+    const r = regionOf(c.address);
+    const parts = [`${octal(c.address)}: ${c.value !== null ? octal(c.value) : READ_TAKES.has(c.address) ? 'not read here: reading it would take the character from the program' : 'nothing answers here (a bus error)'}`];
+    if (c.value !== null) parts.push(`bytes ${octal(c.value & 0xff, 3)} ${octal(c.value >> 8, 3)} (low first) '${charOf(c.value & 0xff)}${charOf(c.value >> 8)}'`, `decimal ${c.value}, signed ${c.value << 16 >> 16}`);
+    parts.push(`in ${r.name}`);
+    if (c.name) parts.push(`label ${c.name}`);
+    const v = vectorName(c.address);
+    if (v && r.region === 'vectors') parts.push(`vector of ${v}`);
+    if (c.role) parts.push(ROLE_TEXT[c.role]);
+    const src = layout?.source(c.address);
+    if (src) parts.push(`${src.rom ? 'rom.mac ' : ''}line ${src.line}`);
+    if (c.address === sim.cpu.r[7]) parts.push('PC points here');
+    if (c.address === sim.cpu.r[6]) parts.push('SP points here');
+    if (c.was !== undefined) parts.push(`changed by the last command (was ${c.was === null ? '------' : octal(c.was)})`);
+    return parts.join(' · ');
+  }
+
+  let layout: ReturnType<typeof memoryLayout> | null = null;
+  function showExplorer(): void {
+    const prog = sim.program;
+    const cpu = sim.cpu;
+    const at = explorerStart();
+    mxAddr.classList.toggle('bad', at === null);
+    const box = $('mx-rows');
+    if (at === null) { box.replaceChildren(div('empty', 'An octal address, a label, a device name or a register.')); return; }
+    const nameOf = addressNamer(prog);
+    layout = memoryLayout(prog, romAssembly(), cpu.r[6], Math.max(sim.stackTop, cpu.r[6] & 0xfffe));
+    const r = regionOf(at);
+    const end = Math.min(0o200000, (at & ~0o17) + MX_ROWS * 2 * ROW_WORDS);
+    $('mx-where').textContent = `${octal(at & ~0o17)}–${octal(end - 1)} · ${r.name} (${octal(r.start)}–${octal(r.end - 1)}): ${r.about}.`;
+    const pc = cpu.r[7];
+    const sp = cpu.r[6];
+    const cls = (c: { address: number; role: Role | null }) => `w ${c.role ?? regionOf(c.address).region}`
+      + (c.address === pc ? ' pc' : '') + (c.address === sp ? ' sp' : '') + (c.address === picked ? ' picked' : '');
+    const pick = (c: MemCell) => (e: Event) => {
+      picked = c.address;
+      e.stopPropagation();
+      show();
+    };
+    const rows: HTMLElement[] = [];
+    if (mxAs.value === 'code') {
+      for (const d of explorerInstructions(peekRead, layout, at, MX_ROWS, nameOf)) {
+        const e = div(`mrow ins ${d.role ?? 'none'}` + (d.address === pc ? ' pc' : '') + (d.address === picked ? ' picked' : ''), '');
+        e.append(
+          Object.assign(document.createElement('span'), { className: 'a', textContent: octal(d.address) }),
+          Object.assign(document.createElement('span'), { className: `w ${d.role ?? regionOf(d.address).region}`, textContent: d.words.map((w) => octal(w)).join(' ').padEnd(20) }),
+          Object.assign(document.createElement('span'), { className: 'lbl', textContent: d.label ? `${d.label}:` : '' }),
+          Object.assign(document.createElement('span'), { className: 't', textContent: d.text }),
+          Object.assign(document.createElement('span'), { className: 'tag', textContent: d.role === 'data' || d.role === 'stack' ? d.role : d.role === 'operand' ? 'inside an instruction' : '' }),
+        );
+        const c: MemCell = { address: d.address, value: d.words[0] ?? null, role: d.role, name: d.label };
+        e.title = cellText(c);
+        e.addEventListener('click', pick(c));
+        if (c.address === picked) showDetail(c);
+        rows.push(e);
+      }
+    } else {
+      const bytes = mxAs.value === 'bytes';
+      for (const row of explorerRows(peekRead, layout, at, MX_ROWS, { before, nameOf })) {
+        const e = div('mrow', '');
+        e.append(Object.assign(document.createElement('span'), { className: 'a', textContent: octal(row.address) }));
+        let text = '';
+        for (const c of row.cells) {
+          const v = c.value;
+          const cell = document.createElement('span');
+          cell.className = cls(c) + (c.was !== undefined ? ' changed' : '') + (c.name ? ' named' : '');
+          cell.textContent = v === null ? (bytes ? '--- ---' : '------') : bytes ? `${octal(v & 0xff, 3)} ${octal(v >> 8, 3)}` : octal(v);
+          cell.title = cellText(c);
+          cell.addEventListener('click', pick(c));
+          if (c.address === picked) showDetail(c);
+          e.append(cell);
+          text += v === null ? '  ' : charOf(v & 0xff) + charOf(v >> 8);
+        }
+        e.append(
+          Object.assign(document.createElement('span'), { className: 'asc', textContent: text }),
+          Object.assign(document.createElement('span'), { className: 'lbl', textContent: row.cells.filter((c) => c.name).map((c) => c.name).join(' ') }),
+        );
+        rows.push(e);
+      }
+    }
+    box.replaceChildren(...rows);
+    if (picked === null) $('mx-detail').replaceChildren(div('empty', 'Click a word to see what it is: its bytes, its label, the line that made it.'));
+  }
+
+  function showDetail(c: MemCell): void {
+    const d = $('mx-detail');
+    d.replaceChildren(document.createTextNode(cellText(c)));
+    const src = layout?.source(c.address);
+    if (src && (src.rom || current())) {
+      const b = Object.assign(document.createElement('button'), { className: 'small secondary', textContent: src.rom ? `rom.mac line ${src.line}` : `Line ${src.line}` });
+      b.addEventListener('click', () => (src.rom ? showRomLine(src.line) : showLine(src.line)));
+      d.append(' ', b);
+    }
+  }
+
+  mxAddr.addEventListener('input', () => { picked = null; show(); });
+  mxAs.addEventListener('change', show);
+  $('mx-prev').addEventListener('click', () => scrollExplorer(-MX_ROWS * 2 * ROW_WORDS));
+  $('mx-next').addEventListener('click', () => scrollExplorer(MX_ROWS * 2 * ROW_WORDS));
+  $('mx-rows').addEventListener('wheel', (e) => {
+    if (!e.deltaY) return;
+    e.preventDefault();
+    scrollExplorer(Math.sign(e.deltaY) * 4 * 2 * ROW_WORDS);
+  }, { passive: false });
+  for (const b of document.querySelectorAll<HTMLButtonElement>('[data-go]')) {
+    b.addEventListener('click', () => {
+      const g = b.dataset.go!;
+      // SCREEN: the page DSPCS shows (bit 2 is the mode; bits 1–0 the page, bit 0 in mode 1)
+      const csr = sim.machine.read(SIM_SYMBOLS.DSPCS, false);
+      goTo(g === 'SCREEN' ? octal(0o120000 + (csr & 4 ? (csr & 1) * 0o20000 : (csr & 3) * 0o10000)) : g);
+    });
+  }
+  $('mem-zoom').addEventListener('click', () => goTo($<HTMLInputElement>('mem-addr').value || 'SP'));
 
   function drawScreen(): void {
     // Once the program has ended, the monitor shows memory as it is (sim.screenNow).
@@ -646,8 +821,8 @@ export function startPage(): void {
     const at = parseAddress(memAddr.value || 'SP', prog?.symbols ?? new Map(), cpu.r);
     memAddr.classList.toggle('bad', at === null);
     $('memory').textContent = at === null ? 'An octal address, a label, a device name or a register.'
-      : memoryRows(read, at, 8, 4).map((r) => `${octal(r.address)}  ${r.words.map((w) => octal(w)).join(' ')}`).join('\n');
-    const base = prog ? (prog.origin >= 0o400 ? prog.origin : 0o1000) : 0o1000;
+      : memoryRows(read, at, 8, 4).map((r) => `${octal(r.address)}  ${r.words.map((w) => (w === null ? '------' : octal(w))).join(' ')}`).join('\n');
+    const base = Math.max(sim.stackTop, cpu.r[6] & 0xfffe);
     const st = stackRows(read, cpu.r[6], base);
     $('stack').textContent = st.length
       ? st.map((r, i) => `${i ? '    ' : 'SP →'} ${octal(r.address)}  ${octal(r.value)}${nameOf(r.value) ? `  ${nameOf(r.value)}` : ''}`).join('\n')
@@ -672,6 +847,7 @@ export function startPage(): void {
     speaker.skip(sim.takeSound());
     if (sim.bells) { speaker.bell(); sim.bells = 0; }
     if (view === 'sound') drawWave();
+    if (view === 'memory') showExplorer();
     showInputs();
   }
 

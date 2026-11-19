@@ -87,6 +87,11 @@ export class Simulator {
   breakpoints: ReadonlySet<number> = new Set();
   /** Instructions run at each word address since the load. */
   readonly heat = new Uint32Array(0x8000);
+  /**
+   * Where the stack starts, for the debugger: the highest SP at an instruction since the boot
+   * (in RAM). A program that sets SP itself (`MOV #STK, SP`) moves it up; pushes don't.
+   */
+  stackTop = 0;
   /** Why the last command stopped, or null. */
   last: Stop | 'step' | null = null;
   /** The trap the CPU stopped on (a vector with no handler). */
@@ -113,7 +118,11 @@ export class Simulator {
     m.onOutput = (ch) => { if (ch === '\x07') this.bells++; };
     // A trap through an empty vector stops instead of jumping to 0 and running the vectors.
     m.cpu.onTrap = (t) => (m.read(t.vector, false) === 0 ? 'stop' : 'vector');
-    m.cpu.onInstruction = (pc) => { this.heat[pc >> 1]++; };
+    m.cpu.onInstruction = (pc) => {
+      this.heat[pc >> 1]++;
+      const sp = m.cpu.r[6];
+      if (sp > this.stackTop && sp <= RAM_END) this.stackTop = sp;
+    };
     this.machine = m;
   }
 
@@ -191,6 +200,7 @@ export class Simulator {
     if (!this.program) return;
     this.machine.boot(this.program);
     this.heat.fill(0);
+    this.stackTop = Math.min(this.cpu.r[6], RAM_END);
     this.typed = [];
     this.pending = [];
     this.last = null;
