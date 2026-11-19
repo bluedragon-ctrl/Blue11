@@ -80,25 +80,42 @@ README as a departure from the original machine.
     a later definition (the 0.4.0 fixes cover `.BLKW`, `. =` and register symbols; check every
     other place where pass 1 and pass 2 can disagree, and make "moved between passes" a
     message that should never be seen).
-12. **Conditional assembly and repetition:** `.IF` / `.IFF` / `.IFT` / `.ENDC` with `EQ NE GT
+12. **A memory explorer in the simulator** (only the simulator; the library's public API is
+    enough). The side panel shows 32 words, so the address space as a whole (vectors, code,
+    data, stack, pixels, ROM, devices) is only in the docs. In four steps, one PR each:
+    1. ~~A **Memory** tab~~ (done, 2026-11-19): 1000₈ bytes at a time, read as words, bytes
+       or instructions, with an ASCII column. Each word is marked by what the assembler made it (an instruction's first
+       word, an operand, data) or the stack, with its label and source line; the PC, SP and the
+       words the last command changed are highlighted; quick jumps to each region. Registers
+       whose read takes a character (`RBUF`, `KBDBUF`) are never read by the debugger (the
+       side panel used to read them, and took the character). The stack starts at the highest
+       SP since the boot, so a program that sets SP itself (`MOV #STK, SP`) shows its stack (it
+       was a guess: the origin, or `1000`).
+    2. A **map of the whole 64 KB**, a cell per word, coloured by region and role, with the PC,
+       SP and the heat; a click opens the tab there.
+    3. **Pixels and addresses:** hovering a pixel on the screen shows its address (`12YYXX`), and
+       a click opens the tab at that byte (and nibble in mode 1).
+    4. **Accesses and watchpoints:** read / write heat per word and "stop when this word is
+       written", through `onAccess`, on only while used, once its cost is measured.
+13. **Conditional assembly and repetition:** `.IF` / `.IFF` / `.IFT` / `.ENDC` with `EQ NE GT
     LT GE LE DF NDF`, `.IIF`, and `.REPT` / `.ENDR`. Small, self-contained, and they let the
     ROM and the examples drop copy-pasted tables.
-13. **Macros:** `.MACRO` / `.ENDM` with arguments, default values and `.NARG`, then `.IRP` /
+14. **Macros:** `.MACRO` / `.ENDM` with arguments, default values and `.NARG`, then `.IRP` /
     `.IRPC`. The largest gap from the original assembler; listings show expansions as the
     original does. Needs a design note in `BLUE11_MACHINE.md` §3 first (what of `.MCALL` the
     predefined symbols replace).
-14. **More of the /40 and its successors' instructions**, each as an option like `eis`: `SPL`
+15. **More of the /40 and its successors' instructions**, each as an option like `eis`: `SPL`
     and `MTPS` / `MFPS` (a priority change that works under `protectModes`), and `MARK`.
-15. **`.INCLUDE`** through a host callback (`options.include(name) → source`), so the
+16. **`.INCLUDE`** through a host callback (`options.include(name) → source`), so the
     simulator's ROM routines and a host's library can be shared without pasting. The library
     stays free of file I/O.
-16. **A differential test against SIMH:** random instruction sequences, compared register by
+17. **A differential test against SIMH:** random instruction sequences, compared register by
     register and flag by flag with traces from SIMH's /40 model (with EIS), checked in as
     fixtures. It pins down the corners: `ASH` / `ASHC` overflow, `DIV` overflow, `SBC` / `ADC`
     flags, the order of side effects in `JSR R, @(R)+` and `MOV R, (R)+`.
-17. **Documented restart rules for hosts:** when `onTrap` stops on a fault, the PC is set back
+18. **Documented restart rules for hosts:** when `onTrap` stops on a fault, the PC is set back
     but autoincrement and autodecrement have already happened. Say so in the README, and
     consider an option to undo them (the /45's `SSR1` records exactly this).
-18. **Later, if wanted:** a third display mode (such as 128 × 128 at 1 bpp), a mouse, more keys,
+19. **Later, if wanted:** a third display mode (such as 128 × 128 at 1 bpp), a mouse, more keys,
    and a shared UI package for the debugger panels HackCode and the simulator have in common
    (extracted only once both exist).

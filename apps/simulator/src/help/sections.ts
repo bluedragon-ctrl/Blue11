@@ -182,10 +182,11 @@ const debugging: Section = {
     h('The panels'),
     list(
       '**CPU**: the [registers](registers), the [PSW](registers#sym-PSW) with its flags (`-` means clear) and the priority.',
-      '**Memory**: words from an address. Type an octal address, a label, a device name (`DSPCS`) or a register (`SP`).',
-      '**Stack**: the words from SP up to where the [stack](stack) started.',
+      '**Memory**: words from an address. Type an octal address, a label, a device name (`DSPCS`) or a register (`SP`). **More…** opens it in the Memory tab.',
+      '**Stack**: the words from SP up to where the [stack](stack) started (the highest SP so far: a program that sets SP itself moves it).',
       '**Disassembly**: the instructions in memory around the PC, with labels.',
       '**Listing**: the assembler\'s output: each line\'s address and the words it became.',
+      '**Memory** tab: memory 1000 bytes at a time, and what each word is. See [the memory explorer](memory#mem-explorer).',
       '**Console**: what the program printed.',
       'The orange bar beside the line numbers is a **heat map**: the brighter, the more often that line ran. It shows where the time goes.',
     ),
@@ -626,6 +627,14 @@ const memory: Section = {
       'Byte instructions (`MOVB`, `CMPB`, `TSTB` …) reach any address. `MOVB` into a register [sign-extends](octal): byte 200–377 becomes negative.',
       'Low byte first: `MOV #1403, @#SCREEN` puts 3 in the first pixel and 3 in the second (`1403` = 3 × 400 + 3).',
     ),
+    entries(e('mem-explorer', [], 'The memory explorer (the Memory tab)',
+      'The **Memory** tab shows 1000 bytes at a time, 20 to a row, and what each word is: '
+        + 'the first word of an **instruction**, an **operand** word (an immediate, an address, an index), **data** from `.WORD`, `.BYTE`, `.ASCII` or `.BLKW`, or the **stack**. '
+        + 'The PC has a frame, SP a green line, a label a dotted underline, and red marks the words the last Step, Step frame or Run changed. Click a word to see its bytes, its label and the line that made it.',
+      'The buttons jump to each region: the PC, SP, the program, the vectors, the page the screen shows, the ROM and the devices. '
+        + 'Typed `PC` or `SP`, the view follows the register as it moves. **words**, **bytes** and **instructions** read the same bits three ways: '
+        + 'read as instructions, data turns into nonsense instructions, and read as bytes, an instruction shows its two halves. '
+        + 'The debugger never reads `RBUF` or `KBDBUF` (shown as `------`): reading them would take the character from the program.')),
   ],
 };
 

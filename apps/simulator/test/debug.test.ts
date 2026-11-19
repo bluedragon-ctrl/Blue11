@@ -1,6 +1,11 @@
 import { assemble } from 'blue11';
 import { describe, expect, it } from 'vitest';
-import { addressNamer, disassemblyAround, lineHeat, memoryRows, parseAddress, registerText, stackRows } from '../src/debug';
+import { octal } from 'blue11';
+import {
+  addressNamer, charOf, disassemblyAround, explorerInstructions, explorerRows, lineHeat, memoryLayout, memoryRows, memorySnapshot, parseAddress, peek,
+  regionOf, registerText, stackRows, vectorName,
+} from '../src/debug';
+import { romAssembly } from '../src/rom';
 import { programSymbols } from '../src/rom';
 import { Simulator } from '../src/sim';
 
@@ -48,5 +53,85 @@ LOOP:   JSR  PC, @#DRAWCH
   it('every predefined name assembles in a program', () => {
     const names = Object.keys(programSymbols()).filter((n) => /^[A-Z]/.test(n));
     expect(assemble(names.map((n) => ` .WORD ${n}`).join('\n'), { symbols: programSymbols() }).errors).toEqual([]);
+  });
+});
+
+describe('the memory explorer', () => {
+  const s = new Simulator();
+  s.load(`
+START:  MOV  #STK, SP     ; 1000
+        MOV  #MSG, R1     ; 1004
+        JSR  PC, SUB      ; 1010
+        HALT              ; 1014
+SUB:    MOV  R1, -(SP)    ; 1016
+        INC  COUNT        ; 1020
+        BPT               ; 1024
+        RTS  PC
+COUNT:  .WORD 0           ; 1030
+MSG:    .ASCIZ /HI/       ; 1032
+        .EVEN
+        .BLKW 20
+STK:                      ; 1076`);
+  const read = (a: number) => s.machine.read(a, false);
+  const prog = s.program!;
+
+  it('never reads RBUF or KBDBUF, which would take the character', () => {
+    const t = new Simulator();
+    t.load('HALT');
+    const r = (a: number) => t.machine.read(a, false);
+    t.machine.type('A');
+    t.keyboard.press('KeyA');
+    expect([peek(r, 0o177562), peek(r, 0o176702), peek(r, 0o170000), peek(r, 0o1001)]).toEqual([null, null, null, 0]);
+    expect(memoryRows(r, 0o177560, 1, 4)[0].words[1]).toBeNull();
+    memorySnapshot(r);
+    explorerRows(r, memoryLayout(null, romAssembly(), 0o1000, 0o1000), 0o176700, 1);
+    expect([r(0o177560) & 0o200, r(0o176700) & 0o200]).toEqual([0o200, 0o200]); // both still waiting
+  });
+
+  it('knows the regions and the vectors', () => {
+    expect([0, 0o776, 0o117776, 0o120000, 0o160000, 0o177776].map((a) => regionOf(a).region))
+      .toEqual(['vectors', 'ram', 'ram', 'pixels', 'rom', 'io']);
+    expect([vectorName(0o34), vectorName(0o36), vectorName(0o60), vectorName(0o40)])
+      .toEqual(['TRAP: new PC', 'TRAP: new PSW', 'console input: new PC', undefined]);
+  });
+
+  it('marks each word: an instruction, its operands, data, the stack; with its line', () => {
+    const l = memoryLayout(prog, romAssembly(), 0o774, 0o1000);
+    expect([0o1000, 0o1002, 0o1004, 0o1014, 0o1030, 0o1032, 0o1034, 0o1036, 0o774, 0o776, 0o772].map((a) => l.role(a)))
+      .toEqual(['code', 'operand', 'code', 'code', 'data', 'data', 'data', 'data', 'stack', 'stack', null]);
+    expect([l.source(0o1002), l.source(0o1030), l.source(0o772), l.source(0o160000)?.rom])
+      .toEqual([{ line: 2, rom: false }, { line: 10, rom: false }, undefined, true]);
+    // SP above the base: no stack
+    expect(memoryLayout(prog, romAssembly(), 0o1002, 0o1000).role(0o776)).toBeNull();
+  });
+
+  it('rows of words, with what the last command changed', () => {
+    expect(prog.symbols.get('STK')).toBe(0o1076);
+    expect(s.stackTop).toBe(0o1000); // SP at the boot
+    const before = memorySnapshot(read);
+    s.runFrame(); // to the BPT in SUB
+    expect(s.stackTop).toBe(0o1076); // MOV #STK, SP moved it; the pushes did not
+    const l = memoryLayout(prog, romAssembly(), s.cpu.r[6], s.stackTop);
+    const [row] = explorerRows(read, l, 0o1030, 1, { before, nameOf: addressNamer(prog) });
+    expect(row.address).toBe(0o1020);
+    const at = (a: number) => row.cells.find((x) => x.address === a)!;
+    expect(at(0o1030)).toEqual({ address: 0o1030, value: 1, was: 0, role: 'data', name: 'COUNT' });
+    expect(at(0o1020)).toEqual({ address: 0o1020, value: 0o5267, role: 'code' }); // INC, unchanged
+    expect(charOf(at(0o1032).value! & 0xff) + charOf(at(0o1032).value! >> 8) + charOf(0)).toBe('HI·');
+    // the two pushes: R1 (MSG) on top, then the return address
+    const [top] = explorerRows(read, l, 0o1060, 1, { before });
+    expect(top.cells.slice(4).map((x) => [x.role, x.value, x.was])).toEqual([['data', 0, undefined], ['stack', 0o1032, 0], ['stack', 0o1014, 0], [null, 0, undefined]]);
+    expect(s.cpu.r[6]).toBe(0o1072);
+  });
+
+  it('reads any words as instructions, data too, and starts on an instruction', () => {
+    const l = memoryLayout(prog, romAssembly(), s.cpu.r[6], 0o1076);
+    const rows = explorerInstructions(read, l, 0o1002, 3, addressNamer(prog));
+    expect(rows.map((r) => [octal(r.address), r.label, r.text, r.role])).toEqual([
+      ['001000', 'START', 'MOV #001076, SP', 'code'],
+      ['001004', undefined, 'MOV #001032, R1', 'code'],
+      ['001010', undefined, 'JSR PC, SUB', 'code'],
+    ]);
+    expect(explorerInstructions(read, l, 0o1030, 1)[0]).toMatchObject({ words: [1], text: 'WAIT', role: 'data' });
   });
 });
