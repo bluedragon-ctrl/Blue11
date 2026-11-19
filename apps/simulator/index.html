@@ -89,19 +89,22 @@
             <button id="mx-prev" class="small secondary" title="1000 bytes back (or the mouse wheel)">▲</button>
             <button id="mx-next" class="small secondary" title="1000 bytes on (or the mouse wheel)">▼</button>
             <label class="mx-check" title="The map of all 64 KB, a dot per word"><input id="mx-show-map" type="checkbox" checked> map</label>
+            <label class="mx-check" title="Count how often the program reads and writes each word (instruction fetches are not counted), from now on: the map shows it, blue for read and orange for written. Running is a little slower while this is on."><input id="mx-accesses" type="checkbox"> reads/writes</label>
           </div>
           <div class="mx-map" id="mx-map-box">
             <canvas id="mx-map" width="512" height="256" title="All 64 KB, a dot per word: 1000 bytes a row. Click: show that word below"></canvas>
             <div class="mx-map-axis"><span>000000<br>vectors<br>RAM</span><span>120000<br>pixels</span><span>160000 ROM</span><span>170000 I/O</span></div>
           </div>
           <div id="mx-map-at" class="mx-map-at">Point at the map: the address and what is there. Click: show it below.</div>
+          <div id="mx-watches" class="mx-watches" hidden></div>
           <div id="mx-where" class="mv-note"></div>
           <div id="mx-rows" class="mv-box mx-rows"></div>
           <div id="mx-detail" class="mx-detail"></div>
           <div class="mx-legend">
             <span class="w code">instruction</span><span class="w operand">operand</span><span class="w data">data</span><span class="w stack">stack</span>
             <span class="w ram">RAM</span><span class="w vectors">vector</span><span class="w pixels">pixels</span><span class="w rom">ROM</span><span class="w io">device</span>
-            <span class="w pc">PC</span><span class="w sp">SP</span><span class="w changed">changed</span><span class="w named">label</span><span class="w hot">run (map: whiter)</span>
+            <span class="w pc">PC</span><span class="w sp">SP</span><span class="w changed">changed</span><span class="w named">label</span><span class="w hot">run (map: whiter)</span><span class="w watched">stops when written</span>
+            <span class="acc read">read</span><span class="acc write">written</span><span class="acc both">both (map, reads/writes)</span>
           </div>
         </div>
         <div class="console">

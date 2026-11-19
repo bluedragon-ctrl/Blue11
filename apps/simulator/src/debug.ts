@@ -314,6 +314,40 @@ export function memoryMapRgba(words: Int32Array, layout: MemoryLayout, out: Uint
   }
 }
 
+/** The colours of the accesses map: words read, words written (both: their sum). */
+export const ACCESS_COLOURS: Readonly<{ read: Rgb; write: Rgb; idle: Rgb }> = {
+  read: [0x39, 0xa0, 0xff], write: [0xff, 0x8a, 0x1e], idle: [0x2a, 0x30, 0x38],
+};
+
+/**
+ * The map by accesses instead (RGBA, like {@link memoryMapRgba}): a word nobody read or wrote
+ * is dark grey (black where nothing answers), one read is blue and one written orange, the
+ * brighter the more often (each against its most-used word); read and written, both.
+ */
+export function accessMapRgba(words: Int32Array, reads: Uint32Array, writes: Uint32Array, out: Uint8ClampedArray): void {
+  let mr = 0;
+  let mw = 0;
+  for (let w = 0; w < 0x8000; w++) { if (reads[w] > mr) mr = reads[w]; if (writes[w] > mw) mw = writes[w]; }
+  const sr = mr ? 1 / Math.log(1 + mr) : 0;
+  const sw = mw ? 1 / Math.log(1 + mw) : 0;
+  const { read, write, idle } = ACCESS_COLOURS;
+  for (let w = 0; w < 0x8000; w++) {
+    const o = w * 4;
+    const kr = reads[w] ? 0.35 + 0.65 * Math.log(1 + reads[w]) * sr : 0;
+    const kw = writes[w] ? 0.35 + 0.65 * Math.log(1 + writes[w]) * sw : 0;
+    const base = words[w] < 0 ? MAP_COLOURS.none : idle;
+    for (let i = 0; i < 3; i++) out[o + i] = kr || kw ? read[i] * kr + write[i] * kw : base[i];
+    out[o + 3] = 255;
+  }
+}
+
+/** A word's accesses in words: "read 3 times, written once", or "not read or written". */
+export function accessText(reads: number, writes: number): string {
+  const times = (n: number) => (n === 1 ? 'once' : `${octal(n, 1)} times`);
+  if (!reads && !writes) return 'not read or written';
+  return [reads ? `read ${times(reads)}` : 'not read', writes ? `written ${times(writes)}` : 'not written'].join(', ');
+}
+
 // ---------------------------------------------------------------- pixels and addresses
 
 /** Where a pixel of the screen is in memory (display spec §3). */

@@ -227,3 +227,91 @@ describe('the screen when the program has ended', () => {
     expect([f.width, f.pixels[128], f.pixels[129]]).toEqual([128, 3, 4]);
   });
 });
+
+describe('accesses and watches', () => {
+  const PROG = [
+    '        MOV #3, R1',
+    'LOOP:   INC CNT',
+    '        MOV CNT, R0',
+    '        MOVB R1, FLAG+1',
+    '        SOB R1, LOOP',
+    '        HALT',
+    'CNT:    .WORD 0',
+    'FLAG:   .WORD 0',
+    '',
+  ].join('\n');
+  const cnt = (s: Simulator) => s.program!.symbols.get('CNT')!;
+  const flag = (s: Simulator) => s.program!.symbols.get('FLAG')!;
+
+  it('counts reads and writes of each word, fetches left out, only while on', () => {
+    const s = new Simulator();
+    expect(s.load(PROG)).toEqual([]);
+    expect(s.cpu.onAccess).toBeNull(); // off: no hook, no cost
+    s.countAccesses(true);
+    expect(s.runFrame().stop).toBe('halt');
+    const { reads, writes } = s.access!;
+    // INC reads and writes CNT, MOV reads it: 3 times round the loop
+    expect([reads[cnt(s) >> 1], writes[cnt(s) >> 1]]).toEqual([6, 3]);
+    expect([reads[flag(s) >> 1], writes[flag(s) >> 1]]).toEqual([0, 3]); // MOVB writes, does not read
+    expect(reads[s.program!.origin >> 1]).toBe(0); // fetched only
+    s.restart();
+    expect(s.access!.writes[cnt(s) >> 1]).toBe(0);
+    s.countAccesses(false);
+    expect([s.access, s.cpu.onAccess]).toEqual([null, null]);
+  });
+
+  it('stops after the instruction that writes a watched word, and goes on', () => {
+    const s = new Simulator();
+    expect(s.load(PROG)).toEqual([]);
+    s.watch(cnt(s) + 1, true); // the odd byte names its word
+    expect(s.watches).toEqual([cnt(s)]);
+    let r = s.runFrame();
+    expect(r.stop).toBe('watch');
+    expect(r.watch).toMatchObject({ address: cnt(s), at: cnt(s), byte: false, was: 0, now: 1 });
+    expect(s.cpu.r[7]).toBe(r.watch!.pc + 4); // after INC CNT (2 words)
+    expect([s.cpu.halted, s.ended]).toEqual([false, false]);
+    r = s.runFrame(true);
+    expect(r.watch).toMatchObject({ was: 1, now: 2 });
+    expect(s.cpu.r[0]).toBe(1); // the MOV after the first INC ran
+    s.watch(cnt(s), false);
+    s.watch(flag(s), true);
+    r = s.step(); // MOV CNT, R0
+    expect(r.stop).toBe('step');
+    r = s.step(); // MOVB R1, FLAG+1: the high byte
+    expect(r.stop).toBe('watch');
+    expect(r.watch).toMatchObject({ address: flag(s), at: flag(s) + 1, byte: true, was: 0o1400, now: 0o1000 });
+    s.watch(flag(s), false);
+    expect(s.runFrame(true).stop).toBe('halt');
+    expect(s.cpu.onAccess).toBeNull();
+  });
+
+  it('tells a push by an interrupt from a write by an instruction', () => {
+    const s = new Simulator();
+    expect(s.load([
+      'START:  MOV  #1000, SP',
+      '        MOV  #TICK, @#100',
+      '        CLR  @#102',
+      '        MOV  #100, @#LKS',
+      'IDLE:   INC  R0',
+      '        BR   IDLE',
+      'TICK:   INC  R2',
+      '        RTI',
+      '',
+    ].join('\n'))).toEqual([]);
+    s.watch(0o776, true); // the PSW the interrupt pushes
+    let r = s.runFrame();
+    for (let i = 0; i < 5 && r.stop === 'frame'; i++) r = s.runFrame();
+    expect(r.stop).toBe('watch');
+    expect(r.watch!.interrupt).toBe(true);
+    expect(s.cpu.r[2]).toBe(1); // the handler's first instruction ran
+    expect(s.cpu.r[7]).toBe(s.program!.symbols.get('TICK')! + 2);
+  });
+
+  it('sees a word the host changed between commands', () => {
+    const s = new Simulator();
+    expect(s.load(PROG)).toEqual([]);
+    s.watch(cnt(s), true);
+    s.machine.write(cnt(s), 0o70, false);
+    expect(s.runFrame().watch).toMatchObject({ was: 0o70, now: 0o71 });
+  });
+});

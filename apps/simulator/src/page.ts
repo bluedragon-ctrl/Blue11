@@ -16,7 +16,7 @@ import { frameToRgba, keyCode, octal, type AsmError, type Frame } from 'blue11';
 import { blue11Asm, blue11Highlight } from 'blue11/codemirror';
 import {
   addressNamer, charOf, disassemblyAround, explorerInstructions, explorerRows, inRom, lineHeat, MAP_COLS, MAP_ROWS, mapAddress,
-  mapCell, memoryLayout, memoryMapRgba, memoryRows, memorySnapshot, parseAddress, pixelAddress, pixelsOfWord, READ_TAKES, regionOf, registerText, ROW_WORDS, stackRows, vectorName, type MemCell, type PixelSpot, type Role,
+  accessMapRgba, accessText, mapCell, memoryLayout, memoryMapRgba, memoryRows, memorySnapshot, parseAddress, pixelAddress, pixelsOfWord, READ_TAKES, regionOf, registerText, ROW_WORDS, stackRows, vectorName, type MemCell, type PixelSpot, type Role,
 } from './debug';
 import { breakpointLines, debugExtensions, setErrors, setHeat, setPcLine, toggleBreakpointAtCursor } from './editor';
 import { CYCLES_PER_SECOND, lastHalfPeriod, shouldPlay } from './audio';
@@ -26,7 +26,7 @@ import { HelpView } from './help/view';
 import { FIRST, PROGRAMS, type Program } from './programs';
 import { romAssembly } from './rom';
 import { SIM_SYMBOLS } from '../../../packages/blue11/examples/examples';
-import { parseRecording, record, Simulator, type InputEvent, type StepResult } from './sim';
+import { parseRecording, record, Simulator, type InputEvent, type StepResult, type WatchHit } from './sim';
 import { Speaker } from './speaker';
 import { Library, shareHash, sharedProgram } from './storage';
 import { describeTrap } from './traps';
@@ -414,11 +414,22 @@ export function startPage(): void {
     switch (r.stop) {
       case 'halt': showStatus(`HALT at ${octal((sim.cpu.r[7] - 2) & 0xffff)}. Continue goes on after it.`, 'done'); break;
       case 'breakpoint': showStatus(`Breakpoint at ${pc}. Step, or Continue.`); break;
+      case 'watch': showStatus(watchText(r.watch!)); break;
       case 'asleep': showStatus(`WAIT at ${pc}, and no device has interrupts on: nothing can wake the CPU.`, 'error'); break;
       case 'double-fault': showStatus(`Double fault at ${pc}: a trap could not push onto the stack (is SP valid?). Run starts again.`, 'error'); break;
       case 'trap': showStatus(describeTrap(r.trap!, sim.cpu, (a) => sim.machine.read(a, false)), 'error'); break;
       default: break;
     }
+  }
+
+  /** The status for a stop on a watched word: which, by what, from what to what. */
+  function watchText(h: WatchHit): string {
+    const name = addressNamer(sim.program)(h.address);
+    const what = `${octal(h.address)}${name ? ` (${name})` : ''}`;
+    const part = h.byte ? `its ${h.at & 1 ? 'high' : 'low'} byte, ` : '';
+    const change = h.was < 0 ? `now ${octal(h.now)}` : h.was === h.now ? `${octal(h.now)} again` : `${octal(h.was)} → ${octal(h.now)}`;
+    if (h.interrupt) return `Stopped: an interrupt pushed onto ${what} (${change}), after the instruction at ${octal(h.pc)}; its handler ran one instruction. Step, or Continue.`;
+    return `Stopped: the instruction at ${octal(h.pc)} wrote ${what}, ${part}${change}. Step, or Continue.`;
   }
 
   function step(): void {
@@ -608,6 +619,8 @@ export function startPage(): void {
     if (src) parts.push(`${src.rom ? 'rom.mac ' : ''}line ${src.line}`);
     if (c.address === sim.cpu.r[7]) parts.push('PC points here');
     if (c.address === sim.cpu.r[6]) parts.push('SP points here');
+    if (sim.access) parts.push(accessText(sim.access.reads[c.address >> 1], sim.access.writes[c.address >> 1]));
+    if (watchSet.has(c.address)) parts.push('a write stops the run');
     if (c.was !== undefined) parts.push(`changed by the last command (was ${c.was === null ? '------' : octal(c.was)})`);
     return parts.join(' · ');
   }
@@ -626,9 +639,26 @@ export function startPage(): void {
   }
 
   let layout: ReturnType<typeof memoryLayout> | null = null;
+  /** The words a write stops at. */
+  let watchSet = new Set<number>();
+  function showWatches(): void {
+    const box = $('mx-watches');
+    const list = sim.watches;
+    box.hidden = !list.length;
+    const nameOf = addressNamer(sim.program);
+    box.replaceChildren('A write stops the run at:', ...list.flatMap((a) => {
+      const go = Object.assign(document.createElement('button'), { className: 'small secondary', textContent: octal(a) + (nameOf(a) ? ` ${nameOf(a)}` : ''), title: 'Show it' });
+      go.addEventListener('click', () => { goTo(octal(Math.max(0, (a & ~0o17) - 4 * 2 * ROW_WORDS))); picked = a; show(); });
+      const x = Object.assign(document.createElement('button'), { className: 'small secondary', textContent: '×', title: 'No longer stop when it is written' });
+      x.addEventListener('click', () => { sim.watch(a, false); show(); });
+      return [go, x];
+    }));
+  }
   function showExplorer(): void {
     const prog = sim.program;
     const cpu = sim.cpu;
+    watchSet = new Set(sim.watches);
+    showWatches();
     screenShown = shownScreen();
     const at = explorerStart();
     mxAddr.classList.toggle('bad', at === null);
@@ -643,7 +673,7 @@ export function startPage(): void {
     const pc = cpu.r[7];
     const sp = cpu.r[6];
     const cls = (c: { address: number; role: Role | null }) => `w ${c.role ?? regionOf(c.address).region}`
-      + (c.address === pc ? ' pc' : '') + (c.address === sp ? ' sp' : '') + (c.address === picked ? ' picked' : '');
+      + (c.address === pc ? ' pc' : '') + (c.address === sp ? ' sp' : '') + (c.address === picked ? ' picked' : '') + (watchSet.has(c.address) ? ' watched' : '');
     const pick = (c: MemCell) => (e: Event) => {
       picked = c.address;
       pickedPixel = null;
@@ -714,7 +744,8 @@ export function startPage(): void {
     $('mx-map-box').hidden = $('mx-map-at').hidden = !showMap.checked;
     if (!showMap.checked || !layout) return;
     mapWords = memorySnapshot(peekRead);
-    memoryMapRgba(mapWords, layout, mapImage.data, { heat: sim.heat, before });
+    if (sim.access) accessMapRgba(mapWords, sim.access.reads, sim.access.writes, mapImage.data);
+    else memoryMapRgba(mapWords, layout, mapImage.data, { heat: sim.heat, before });
     mapDotsCtx.putImageData(mapImage, 0, 0);
     const k = mapCanvas.width / MAP_COLS;
     mapCtx.imageSmoothingEnabled = false;
@@ -736,6 +767,7 @@ export function startPage(): void {
       mapCtx.lineWidth = 2;
       mapCtx.strokeRect(c.x * k - 3, c.y * k - 3, k + 6, k + 6);
     };
+    for (const a of watchSet) ring(a, '#ff8a1e');
     ring(sim.cpu.r[6], '#3cff3c');
     ring(sim.cpu.r[7], '#ffffff');
     if (picked !== null) ring(picked, '#39d0ff');
@@ -767,6 +799,8 @@ export function startPage(): void {
     show();
   });
   showMap.addEventListener('change', show);
+  const countAccesses = $<HTMLInputElement>('mx-accesses');
+  countAccesses.addEventListener('change', () => { sim.countAccesses(countAccesses.checked); show(); });
 
   function showDetail(c: MemCell): void {
     const d = $('mx-detail');
@@ -779,6 +813,13 @@ export function startPage(): void {
         + (px.half ? `, its ${px.half} half (bits ${px.half === 'high' ? '7–4' : '3–0'}): ${octal(byte, 3)} → colour ${octal(colour, 2)}` : `: ${octal(byte, 3)} → colour ${octal(colour, 2)}${byte > 15 ? ' (the high 4 bits are kept, not shown)' : ''}`)
         + '.'));
     }
+    const w = Object.assign(document.createElement('button'), {
+      className: 'small secondary',
+      textContent: watchSet.has(c.address) ? 'Don’t stop when written' : 'Stop when written',
+      title: 'Stop the run after an instruction writes this word (or a byte of it), and say what it wrote',
+    });
+    w.addEventListener('click', () => { sim.watch(c.address, !watchSet.has(c.address)); show(); });
+    d.append(' ', w);
     const src = layout?.source(c.address);
     if (src && (src.rom || current())) {
       const b = Object.assign(document.createElement('button'), { className: 'small secondary', textContent: src.rom ? `rom.mac line ${src.line}` : `Line ${src.line}` });

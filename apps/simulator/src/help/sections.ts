@@ -178,6 +178,7 @@ const debugging: Section = {
       'Click left of a line number, or press **F9** on the line: a red dot. Run and Continue stop **before** that instruction runs.',
       'Click a row in **Disassembly** to set one by address, also inside the [ROM](rom).',
       'A `BPT` instruction in the code stops the run too; Continue goes on after it.',
+      'To stop when a **word is written** (by whichever instruction), click it in the Memory tab, then **Stop when written**. See [watching a word](memory#mem-watch).',
     ),
     h('The panels'),
     list(
@@ -640,7 +641,15 @@ const memory: Section = {
         + 'your program is a few dots near the top, the pixel memory is the band at 120000, the ROM and the devices are at the bottom. '
         + 'A 0 is dim, black means nothing answers there, red is what the last command changed, and the more often a word ran as an instruction, the whiter it is. '
         + 'The PC has a white square, SP a green one, and a frame shows the 1000 bytes in the rows. Point at a dot to see what is there; click it to show it in the rows. The **map** box hides it. '
-        + 'A word of pixel memory says which pixels it holds, and Shift+click on the screen opens the byte of a pixel.')),
+        + 'A word of pixel memory says which pixels it holds, and Shift+click on the screen opens the byte of a pixel.'),
+    e('mem-watch', [], 'Reads, writes and stopping when a word is written',
+      'Tick **reads/writes** and the simulator counts, from then on, how often the program reads and writes each word (fetching instructions is not counted: that is the heat). '
+        + 'The map then shows the counts instead: **blue** for read, **orange** for written, yellow for both, the brighter the more often; a word\'s text says its counts. '
+        + 'It shows at a glance which data a program uses, and where it writes that it should not. Restart sets the counts to 0; running is a little slower while it is on.',
+      'Click a word, then **Stop when written**: the run stops right after an instruction writes it (the word or one of its bytes, even with the value it had), '
+        + 'and the status line says which instruction and what it wrote: `Stopped: the instruction at 001004 wrote 001032 (CNT), 000004 → 000005`. '
+        + 'Step or Continue go on. It finds the line that spoils a variable, or writes past the end of a table: watch the word after it. '
+        + 'The words watched have an orange frame, and are listed above the rows; **×** removes one.')),
   ],
 };
 
