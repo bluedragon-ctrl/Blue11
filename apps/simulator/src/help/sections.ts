@@ -144,7 +144,7 @@ const running: Section = {
     h('Time and speed'),
     p(`The machine runs in **frames** of ${dec(FRAME)} cycles; the [display](display) shows one picture per frame, 60 a second. `
       + 'A **cycle** is one trip to memory, so a short instruction costs 1–3 [cycles](cycles). '
-      + 'A frame is also one tick of the 60 Hz line clock. **Speed** says how fast the machine runs against **real time**, 60 frames (ticks) per second of your time: from 1/60 of real time to 10× real time. A program behaves exactly the same at every speed: only you see it faster or slower.'),
+      + 'A frame is also one tick of the 60 Hz line clock. **Speed** says how fast the machine runs against **real time**, 60 frames (ticks) per second of your time: from 1/60 of real time to 10× real time. A program behaves exactly the same at every speed: only you see (and hear) it faster or slower.'),
     h('Typing into your program'),
     p('Click the screen or the console first: the label says *keyboard → program*. Now every key goes to the program: to the [keyboard](keyboard) device, and a key that types a character also to the [console](console). '
       + 'Ctrl and Cmd shortcuts stay with the browser. Clicking elsewhere releases every key.'),
@@ -1028,7 +1028,7 @@ const sound: Section = {
     entries(...symbolEntries('SNDCS', 'SNDDIV')),
     h('In the simulator'),
     list(
-      'Turn **Sound** on in the settings. It plays only when **Speed** is at **real time** (the middle of the slider): at any other speed, while paused and while stepping it is silent, because the pitch would be wrong.',
+      'Turn **Sound** on in the settings. At **real time** (the middle of **Speed**) a note plays at its true pitch. At other speeds the sound plays like a tape at the wrong speed: at 1/2 of real time an octave lower and twice as long, at 2× an octave higher; very slow, a note breaks up into clicks, one per switch of the speaker. Paused and stepping, it is silent.',
       'The **Sound** tab draws the speaker over the last frame against a ruler in cycles, and the last half period it measured: you can see a note without hearing it.',
       'A program that prints character 7 (BEL) on the [console](console) rings the bell.',
       'In the Examples menu, under Sound: the **A beeper note**, **A scale**, **A tune** and **Play and draw** examples.',

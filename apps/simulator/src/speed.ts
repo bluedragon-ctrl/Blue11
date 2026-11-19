@@ -17,14 +17,3 @@ export function speedLabel(fps: number): string {
   const n = REAL_TIME / fps;
   return Number.isInteger(n) ? `1/${n} of real time` : `${+(fps / REAL_TIME).toFixed(2)}× real time`;
 }
-
-/** The text beside the slider; with sound on, it says why the speaker is silent. */
-export function speedText(fps: number, sound: boolean): string {
-  const label = speedLabel(fps);
-  return fps === REAL_TIME || !sound ? label : `${label} (silent)`;
-}
-
-/** Why the sound is silent, for the text's tooltip, or '' when it is not. */
-export function speedWhy(fps: number, sound: boolean): string {
-  return fps === REAL_TIME || !sound ? '' : 'Sound plays only at real time: at any other speed the pitch would be wrong. Move Speed to the middle.';
-}

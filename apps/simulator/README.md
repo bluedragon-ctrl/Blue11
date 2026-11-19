@@ -23,9 +23,10 @@ deployed to GitHub Pages from `main`: **[bluedragon-ctrl.github.io/Blue11](https
   Otherwise a program that halts within its first frame would leave the screen black.
 - **Console** (the DL11 terminal), below the tabs, so it stays in view with each of them.
 - **Sound** (on unless turned off, with its volume, kept in the browser): the speaker
-  (`SNDCS`, `SNDDIV`, [sound spec](../../docs/BLUE11_SOUND.md)) played with Web Audio. It plays
-  only at real time (60 frames/s), and is silent at other speeds, while paused and while
-  stepping, so a note is never heard at the wrong pitch. The **Sound** tab draws the speaker over
+  (`SNDCS`, `SNDDIV`, [sound spec](../../docs/BLUE11_SOUND.md)) played with Web Audio. At real
+  time (60 frames/s) it plays at its true pitch; at other speeds it plays like a tape at the
+  wrong speed (half speed: an octave lower), so students hear what the speed does to the
+  ticks. It is silent while paused and while stepping. The **Sound** tab draws the speaker over
   the last frame against a ruler in cycles, with the last half period it measured. A program
   that prints BEL (7) on the console rings a bell. The edges become samples in `src/audio.ts`
   (no DOM, tested); `src/speaker.ts` queues them a little ahead of the audio clock.

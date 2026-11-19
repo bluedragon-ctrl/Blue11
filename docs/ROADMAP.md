@@ -74,7 +74,7 @@ README as a departure from the original machine.
     [`BLUE11_SOUND.md`](BLUE11_SOUND.md)): the `Sound` device (a beeper bit and a tone
     generator, edges recorded at the cycle of each write through the new `DeviceMachine.now`),
     its tests and four examples, a README section and the departure listed; in the simulator,
-    the speaker played with Web Audio at real time only, volume and mute, a Sound tab with the
+    the speaker played with Web Audio (true pitch at real time, like a tape at other speeds), volume and mute, a Sound tab with the
     last frame's waveform, the console's bell, and a help page.
 11. **Assembler messages for sizes.** Name the symbol and its line whenever a size depends on
     a later definition (the 0.4.0 fixes cover `.BLKW`, `. =` and register symbols; check every

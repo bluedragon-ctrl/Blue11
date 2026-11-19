@@ -19,8 +19,8 @@ import {
   accessMapRgba, accessText, mapCell, memoryLayout, memoryMapRgba, memoryRows, memorySnapshot, parseAddress, pixelAddress, pixelsOfWord, numberParts, READ_TAKES, regionOf, registerText, registerTitles, ROW_WORDS, stackRows, vectorName, type MemCell, type PixelSpot, type Role,
 } from './debug';
 import { breakpointLines, debugExtensions, setErrors, setHeat, setPcLine, toggleBreakpointAtCursor } from './editor';
-import { CYCLES_PER_SECOND, lastHalfPeriod, shouldPlay } from './audio';
-import { REAL_TIME, SPEEDS, speedText as speedLine, speedWhy } from './speed';
+import { CYCLES_PER_SECOND, cyclesPerSecondAt, lastHalfPeriod } from './audio';
+import { REAL_TIME, SPEEDS, speedLabel } from './speed';
 import { HELP, inComment, wordAt } from './help';
 import { helpTooltip } from './help/tooltip';
 import { numberTooltip } from './number-tip';
@@ -244,11 +244,10 @@ export function startPage(): void {
   const speedText = $('speed-text');
   const fps = () => SPEEDS[Number(speed.value)] ?? REAL_TIME;
   function showSpeed(): void {
-    speedText.textContent = speedLine(fps(), soundOn.checked);
-    speedText.title = speedWhy(fps(), soundOn.checked);
+    speedText.textContent = speedLabel(fps());
     try { browserStorage()?.setItem('blue11.sim.speed', speed.value); } catch { /* off */ }
   }
-  speed.addEventListener('input', showSpeed);
+  speed.addEventListener('input', () => { speaker.cut(); showSpeed(); });
   const savedSpeed = (() => { try { return browserStorage()?.getItem('blue11.sim.speed'); } catch { return null; } })();
   if (savedSpeed !== null && savedSpeed !== undefined && SPEEDS[Number(savedSpeed)] !== undefined) speed.value = savedSpeed;
   showSpeed();
@@ -352,6 +351,7 @@ export function startPage(): void {
 
   function run(): void {
     if (!load()) return;
+    speaker.cut(); // the last run's sound
     go(false);
   }
 
@@ -373,6 +373,7 @@ export function startPage(): void {
     if (!running) return;
     running = false;
     cancelAnimationFrame(animation);
+    speaker.cut(); // at a slow speed seconds of sound can be queued
     showStatus(`Paused at ${octal(sim.cpu.r[7])}.`);
     show();
   }
@@ -400,8 +401,7 @@ export function startPage(): void {
       owed -= 1;
       const r = sim.runFrame(resumeNext);
       resumeNext = false;
-      const chunk = sim.takeSound();
-      if (shouldPlay(true, fps())) speaker.play(chunk); else speaker.skip(chunk);
+      speaker.play(sim.takeSound(), cyclesPerSecondAt(fps()));
       if (r.stop !== 'frame') stopped(r);
       if (performance.now() > until) { owed = 0; break; }
     }
