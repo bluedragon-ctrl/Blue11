@@ -14,6 +14,7 @@ import { ROM_BASE, ROM_SIZE, romAssembly } from '../rom';
 import { OP_GROUPS, opEntry } from './instructions';
 import { code, dec, entries, h, list, note, p, table, type Block, type Entry, type Section } from './model';
 import { symbolEntries } from './symbols';
+import { CPU_HZ, FRAME_CYCLES, TICK_CYCLES } from '../time';
 
 const o = (n: number, digits = 6) => octal(n, digits);
 const START = 'Start';
@@ -24,8 +25,9 @@ const MACHINE = 'The machine';
 const DEVICES = 'Devices';
 const REFERENCE = 'Reference';
 
-/** Cycles per frame, and so per line-clock tick. */
-const FRAME = 20000;
+/** Cycles per screen frame, and per line-clock tick: two rates, the same today. */
+const FRAME = FRAME_CYCLES;
+const TICK = TICK_CYCLES;
 const RAM_END = DSP.SCREEN;
 
 const e = (anchor: string, names: string[], term: string, text: string, detail?: string): Entry =>
@@ -142,9 +144,9 @@ const running: Section = {
     p('To go one step at a time, see [Debugging](debugging).'),
     p('While the program runs, the screen shows a new picture every frame. When it has ended (a `HALT`, or an error), the screen shows the pixel memory as it is, as a real monitor goes on showing it while the CPU stands still.'),
     h('Time and speed'),
-    p(`The machine runs in **frames** of ${dec(FRAME)} cycles; the [display](display) shows one picture per frame, 60 a second. `
-      + 'A **cycle** is one trip to memory, so a short instruction costs 1–3 [cycles](cycles). '
-      + 'A frame is also one tick of the 60 Hz line clock. **Speed** (in **Settings**, the ⚙ next to Help) says how fast the machine runs against **real time**, 60 frames (ticks) per second of your time: from 1/60 of real time to 10× real time. A program behaves exactly the same at every speed: only you see (and hear) it faster or slower.'),
+    p(`The machine's time is counted in **cycles**: its CPU clock runs ${dec(CPU_HZ)} a second. A cycle is one trip to memory, so a short instruction costs 1–3 [cycles](cycles). `
+      + `Two devices count those cycles, each at its own rate: the [display](display) refreshes the screen every ${dec(FRAME)} cycles (a **frame**, ${CPU_HZ / FRAME} a second), and the [line clock](clock) **ticks** every ${dec(TICK)} cycles (${CPU_HZ / TICK} a second). The two are the same today, but they are different things: the screen is for pictures, the tick for timing. `
+      + '**Speed** (in **Settings**, the ⚙ next to Help) says how fast the machine\'s time runs against **real time**, the CPU clock\'s own rate: from 1/60 of real time to 10× real time. A program behaves exactly the same at every speed: only you see (and hear) it faster or slower.'),
     h('Typing into your program'),
     p('Click the screen or the console first: the label says *keyboard → program*. Now every key goes to the program: to the [keyboard](keyboard) device, and a key that types a character also to the [console](console). '
       + 'Ctrl and Cmd shortcuts stay with the browser. Clicking elsewhere releases every key.'),
@@ -761,7 +763,7 @@ const interrupts: Section = {
     table(['Vector', 'Device', 'Interrupts when'], [
       [o(DEV.VEC_RX, 3), '[console](console) receiver', 'a typed character is waiting in `RBUF`'],
       [o(DEV.VEC_TX, 3), 'console transmitter', 'it is ready for the next character'],
-      [o(DEV.VEC_CLOCK, 3), '[line clock](clock)', 'every tick (once a frame)'],
+      [o(DEV.VEC_CLOCK, 3), '[line clock](clock)', `every tick (${CPU_HZ / TICK} a second)`],
       [o(DSP.VEC, 3), '[display](display-frames) (`DSPVEC`)', 'every vertical blank'],
       [o(KBD.VEC, 3), '[keyboard](keyboard-events) (`KBDVEC`)', 'a key event is waiting in `KBDBUF`'],
     ]),
@@ -828,7 +830,8 @@ const consoleSection: Section = {
 const clock: Section = {
   id: 'clock', title: 'Line clock', group: DEVICES,
   blocks: [
-    p(`The line clock (DEC's KW11-L) ticks once a frame, every ${dec(FRAME)} cycles: 60 times a second of the machine's time. Use it to time things: a game step, a blink, a countdown.`),
+    p(`The line clock (DEC's KW11-L) ticks every ${dec(TICK)} cycles: ${CPU_HZ / TICK} times a second of the machine's time, as the mains power drove it on the original machine. Use it to time things: a game step, a blink, a countdown. `
+      + 'It is not the screen\'s refresh: that is the [display](display-frames)\'s own frame, which happens to have the same rate here. To draw without tearing, wait for the display\'s blank, not the tick.'),
     entries(...symbolEntries('LKS')),
     list(
       'Polling: `BIC #200, @#LKS`, then wait until `TSTB @#LKS` is negative.',

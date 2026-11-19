@@ -182,7 +182,7 @@ The library gives edges; the simulator makes them into sound with the Web Audio 
   At other sample rates a sample is a fraction of cycles, and the same rule applies. A gentle
   high-pass filter removes the constant part, so a speaker left out is silence, not a click
   that never ends. This is a pure function in the simulator's core (`src/sim.ts`), with tests.
-- **At every speed, like a tape.** At real time (60 frames a second) the sound has its true
+- **At every speed, like a tape.** At real time (the CPU clock's own rate, 1.2 M cycles a second) the sound has its true
   pitch. At another speed a frame's cycles take that much more or less wall time, so the
   sound plays slower and lower, or faster and higher: at 1/2 of real time an octave lower and
   twice as long, at 1/60 a note breaks up into single clicks. Students hear what the speed does

@@ -7,15 +7,7 @@
  */
 
 import type { Edge, SoundChunk } from 'blue11';
-import { REAL_TIME } from './speed';
-
-/** The machine's speed: 60 frames of 20000 cycles a second. */
-export const CYCLES_PER_SECOND = 1_200_000;
-
-/** The machine's cycles per second of wall time at a speed in frames (ticks) per second. */
-export function cyclesPerSecondAt(fps: number): number {
-  return (CYCLES_PER_SECOND / REAL_TIME) * fps;
-}
+import { CPU_HZ } from './time';
 
 /** The share of `[a, b)` the speaker was out, given its level at `from` and the edges after it. */
 function outShare(level: 0 | 1, edges: readonly Edge[], start: number, a: number, b: number): { share: number; level: 0 | 1; start: number } {
@@ -49,7 +41,7 @@ export class Resampler {
   private prevOut = 0;
   private readonly a: number;
 
-  constructor(readonly sampleRate: number, cyclesPerSecond = CYCLES_PER_SECOND, cutoffHz = 20) {
+  constructor(readonly sampleRate: number, cyclesPerSecond = CPU_HZ, cutoffHz = 20) {
     this.stepCycles = cyclesPerSecond / sampleRate;
     const rc = 1 / (2 * Math.PI * cutoffHz);
     this.a = rc / (rc + 1 / sampleRate);
@@ -139,7 +131,7 @@ export class History {
  * What the waveform view says about the last edges: the cycles between the last two, and the
  * frequency they make, or null with fewer than two.
  */
-export function lastHalfPeriod(t: Trace, cyclesPerSecond = CYCLES_PER_SECOND): { cycles: number; hz: number } | null {
+export function lastHalfPeriod(t: Trace, cyclesPerSecond = CPU_HZ): { cycles: number; hz: number } | null {
   const e = t.edges;
   if (e.length < 2) return null;
   const cycles = e[e.length - 1].cycle - e[e.length - 2].cycle;

@@ -4,8 +4,9 @@
  * the memory explorer,
  * the ROM, the examples and saved programs, sharing by URL, the input log, and the help.
  *
- * The machine runs whole frames paced by animation frames. The speed setting (frames per
- * second of wall time) is the only use of wall-clock time, with the speaker's scheduling
+ * The machine runs whole screen frames paced by animation frames, as many as the speed setting
+ * (a multiple of real time, the CPU clock's rate) makes the wall time worth. That is the only
+ * use of wall-clock time, with the speaker's scheduling
  * (src/speaker.ts), and it never reaches the simulation (src/sim.ts), whose time is cycles.
  */
 
@@ -19,8 +20,9 @@ import {
   accessMapRgba, accessText, mapCell, memoryLayout, memoryMapRgba, memoryRows, memorySnapshot, parseAddress, pixelAddress, pixelsOfWord, numberParts, READ_TAKES, regionOf, registerText, registerTitles, ROW_WORDS, stackRows, vectorName, type MemCell, type PixelSpot, type Role,
 } from './debug';
 import { breakpointLines, debugExtensions, setErrors, setHeat, setPcLine, toggleBreakpointAtCursor } from './editor';
-import { CYCLES_PER_SECOND, cyclesPerSecondAt, lastHalfPeriod } from './audio';
-import { REAL_TIME, SPEEDS, speedLabel, speedShort } from './speed';
+import { lastHalfPeriod } from './audio';
+import { cyclesPerSecondAt, REAL_TIME, SPEEDS, speedLabel, speedShort } from './speed';
+import { CPU_HZ } from './time';
 import { HELP, inComment, wordAt } from './help';
 import { helpTooltip } from './help/tooltip';
 import { numberTooltip } from './number-tip';
@@ -87,7 +89,7 @@ export function startPage(): void {
   let running = false;
   let animation = 0;
   let lastTime = 0;
-  let owed = 0; // frames owed to the speed setting, fractional
+  let owed = 0; // screen frames owed to the speed setting, fractional
   let resumeNext = false; // the next frame passes a breakpoint at the PC (Continue)
   /** The example open in the editor (its keys hint, its console input), or null. */
   let example: Program | null = null;
@@ -252,11 +254,12 @@ export function startPage(): void {
   // Away from real time, the gear says so: the speed is out of sight.
   const speedBadge = $('speed-badge');
   const speedText = $('speed-text');
-  const fps = () => SPEEDS[Number(speed.value)] ?? REAL_TIME;
+  /** The speed: a multiple of real time. */
+  const rate = () => SPEEDS[Number(speed.value)] ?? REAL_TIME;
   function showSpeed(): void {
-    speedText.textContent = speedLabel(fps());
-    speedBadge.hidden = fps() === REAL_TIME;
-    speedBadge.textContent = speedShort(fps());
+    speedText.textContent = speedLabel(rate());
+    speedBadge.hidden = rate() === REAL_TIME;
+    speedBadge.textContent = speedShort(rate());
     try { browserStorage()?.setItem('blue11.sim.speed', speed.value); } catch { /* off */ }
   }
   speed.addEventListener('input', () => { speaker.cut(); showSpeed(); });
@@ -404,7 +407,8 @@ export function startPage(): void {
 
   function tick(now: number): void {
     if (!running) return;
-    owed = Math.min(owed + ((now - lastTime) / 1000) * fps(), 50);
+    // The machine's cycles this wall time is worth, in whole screen frames.
+    owed = Math.min(owed + ((now - lastTime) / 1000) * cyclesPerSecondAt(rate()) / sim.frameCycles, 50);
     lastTime = now;
     syncBreakpoints();
     const until = performance.now() + BUDGET_MS;
@@ -413,7 +417,7 @@ export function startPage(): void {
       owed -= 1;
       const r = sim.runFrame(resumeNext);
       resumeNext = false;
-      speaker.play(sim.takeSound(), cyclesPerSecondAt(fps()));
+      speaker.play(sim.takeSound(), cyclesPerSecondAt(rate()));
       if (r.stop !== 'frame') stopped(r);
       if (performance.now() > until) { owed = 0; break; }
     }
@@ -967,7 +971,7 @@ export function startPage(): void {
     waveCtx.lineTo(x(t.to), level ? hi : lo);
     waveCtx.stroke();
     waveCtx.lineWidth = 1;
-    const half = lastHalfPeriod(t, CYCLES_PER_SECOND);
+    const half = lastHalfPeriod(t, CPU_HZ);
     const read = (a: number) => sim.machine.read(a, false);
     $('wave-info').textContent = [
       `${t.edges.length} edge${t.edges.length === 1 ? '' : 's'} in the last frame`,

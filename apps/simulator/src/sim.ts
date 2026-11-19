@@ -11,6 +11,7 @@ import {
   assemble, DSP, octal, SimpleMachine, type AsmError, type AssembleResult, type Beam, type Frame, type Key, type SoundChunk, type StopReason, type TrapInfo,
 } from 'blue11';
 import { History } from './audio';
+import { FRAME_CYCLES, TICK_CYCLES } from './time';
 import { makeRom, programSymbols } from './rom';
 
 /** One input of a run, at the cycle it happened. */
@@ -128,7 +129,7 @@ export class Simulator {
   /** The trap the CPU stopped on (a vector with no handler). */
   trap: TrapInfo | null = null;
   /** The speaker's last frame of edges, for the waveform view (one frame of cycles). */
-  readonly history = new History(20000);
+  readonly history = new History(FRAME_CYCLES);
   /** BEL characters (7) the program printed and the page has not rung yet. */
   bells = 0;
 
@@ -162,7 +163,8 @@ export class Simulator {
   }
 
   private build(): void {
-    const m = new SimpleMachine({ display: { beam: this.beam }, keyboard: true, sound: true, eis: this.eis });
+    const m = new SimpleMachine({
+      display: { beam: this.beam, frameCycles: FRAME_CYCLES }, clockCycles: TICK_CYCLES, keyboard: true, sound: true, eis: this.eis });
     m.add(makeRom());
     m.onOutput = (ch) => { if (ch === '\x07') this.bells++; };
     // A trap through an empty vector stops instead of jumping to 0 and running the vectors.
@@ -272,7 +274,7 @@ export class Simulator {
   get keyboard() { return this.machine.keyboard!; }
   get sound() { return this.machine.sound!; }
   get cpu() { return this.machine.cpu; }
-  /** Cycles per frame (20000). */
+  /** Cycles per screen frame (FRAME_CYCLES). */
   get frameCycles(): number { return this.display.frameCycles; }
 
   /** Another beam or EIS setting: a new machine, and the program (if any) booted again from the start. */

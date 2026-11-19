@@ -153,7 +153,7 @@
         <label class="row speed">Speed
           <input id="speed" type="range" min="0" max="9" value="6"> <span id="speed-text"></span>
         </label>
-        <p class="why">How fast the machine runs against real time. The machine counts time in frames of 20000 cycles, one tick of its 60 Hz line clock each: at real time 60 run per second of your time. A program behaves exactly the same at every speed; its sound plays slower and lower, or faster and higher, like a tape.</p>
+        <p class="why">How fast the machine's time runs against real time. Real time is the CPU clock's own rate, 1200000 cycles a second: then the screen refreshes 60 times a second and the line clock ticks 60 times a second, two separate rates that happen to be equal. A program behaves exactly the same at every speed; its sound plays slower and lower, or faster and higher, like a tape.</p>
         <h3>Sound</h3>
         <label class="row"><input id="sound" type="checkbox"> Sound</label>
         <p class="why">The speaker (SNDCS, SNDDIV). At real time it plays at its true pitch; slower is lower, faster is higher.</p>

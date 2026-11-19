@@ -1,6 +1,7 @@
 import type { SoundChunk } from 'blue11';
 import { describe, expect, it } from 'vitest';
-import { cyclesPerSecondAt, History, lastHalfPeriod, Resampler } from '../src/audio';
+import { History, lastHalfPeriod, Resampler } from '../src/audio';
+import { cyclesPerSecondAt } from '../src/speed';
 import { Simulator } from '../src/sim';
 
 const chunk = (from: number, to: number, level: 0 | 1, edges: Array<[number, 0 | 1]> = []): SoundChunk =>
@@ -58,13 +59,13 @@ describe('edges to samples', () => {
 
 describe('sound at other speeds', () => {
   it('a frame lasts its share of a second of wall time, at every speed', () => {
-    expect(cyclesPerSecondAt(60)).toBe(1_200_000);
-    expect(cyclesPerSecondAt(30)).toBe(600_000);
-    expect(cyclesPerSecondAt(600)).toBe(12_000_000);
+    expect(cyclesPerSecondAt(1)).toBe(1_200_000);
+    expect(cyclesPerSecondAt(1 / 2)).toBe(600_000);
+    expect(cyclesPerSecondAt(10)).toBe(12_000_000);
     const r = new Resampler(48000);
-    r.cyclesPerSecond = cyclesPerSecondAt(30); // half speed: a frame is 1/30 s, an octave lower
+    r.cyclesPerSecond = cyclesPerSecondAt(1 / 2); // half speed: a frame is 1/30 s, an octave lower
     expect(r.push(chunk(0, 20000, 0)).length).toBe(1600);
-    r.cyclesPerSecond = cyclesPerSecondAt(600); // 10×: a frame is 1/600 s
+    r.cyclesPerSecond = cyclesPerSecondAt(10); // 10×: a frame is 1/600 s
     expect(r.push(chunk(20000, 40000, 0)).length).toBe(80);
   });
 
@@ -83,7 +84,7 @@ describe('sound at other speeds', () => {
   it('a change of speed goes on from the same cycle, with no gap', () => {
     const r = new Resampler(44100);
     let n = r.push(chunk(0, 20000, 0)).length;
-    r.cyclesPerSecond = cyclesPerSecondAt(1);
+    r.cyclesPerSecond = cyclesPerSecondAt(1 / 60);
     n += r.push(chunk(20000, 40000, 0)).length;
     expect(Math.abs(n - (735 + 44100))).toBeLessThanOrEqual(1);
   });
