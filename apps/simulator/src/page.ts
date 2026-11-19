@@ -78,7 +78,6 @@ export function startPage(): void {
     continue: $<HTMLButtonElement>('continue'),
     pause: $<HTMLButtonElement>('pause'),
     step: $<HTMLButtonElement>('step'),
-    stepFrame: $<HTMLButtonElement>('step-frame'),
     restart: $<HTMLButtonElement>('restart'),
     replay: $<HTMLButtonElement>('replay'),
     save: $<HTMLButtonElement>('save'),
@@ -340,7 +339,6 @@ export function startPage(): void {
     buttons.continue.disabled = running || !can;
     buttons.pause.disabled = !running;
     buttons.step.disabled = running;
-    buttons.stepFrame.disabled = running || !can;
     buttons.restart.disabled = !sim.program;
     buttons.replay.disabled = !current();
     $<HTMLButtonElement>('save-log').disabled = !current();
@@ -473,15 +471,6 @@ export function startPage(): void {
   buttons.continue.addEventListener('click', () => { if (current()) go(true); });
   buttons.pause.addEventListener('click', pause);
   buttons.step.addEventListener('click', step);
-  buttons.stepFrame.addEventListener('click', () => {
-    if (!current()) return;
-    syncBreakpoints();
-    mark();
-    const r = sim.runFrame(true);
-    if (r.stop === 'frame') showStatus(`Ran ${plural(r.instructions, 'instruction')} (${plural(r.cycles, 'cycle')}) to the end of the frame: frame ${octal(sim.display.frame.number)} is on the screen.`);
-    else stopped(r);
-    show();
-  });
   buttons.restart.addEventListener('click', () => {
     pause();
     if (current()) sim.restart(); else if (!load()) return;

@@ -173,7 +173,6 @@ const debugging: Section = {
     h('Stepping'),
     list(
       '**Step instruction** (F10) runs exactly one instruction, then stops. If the code changed, it loads it first. The status line shows how many [cycles](cycles) it took.',
-      '**Step to next frame** runs every instruction up to the end of this frame (at most 20000 cycles, 1/60 s of the machine\'s time: one picture), then stops; a breakpoint stops it sooner. The status line says how many instructions and cycles that was: often thousands, where Step instruction is one. Handy for a game, which does its work once a frame: one press, one picture.',
       'The current instruction is highlighted in the editor and in the disassembly.',
     ),
     h('Breakpoints'),
@@ -634,7 +633,7 @@ const memory: Section = {
     entries(e('mem-explorer', [], 'The memory explorer (the Memory tab)',
       'The **Memory** tab shows 1000 bytes at a time, 20 to a row, and what each word is: '
         + 'the first word of an **instruction**, an **operand** word (an immediate, an address, an index), **data** from `.WORD`, `.BYTE`, `.ASCII` or `.BLKW`, or the **stack**. '
-        + 'The PC has a frame, SP a green line, a label a dotted underline, and red marks the words the last Step instruction, Step to next frame or Run changed. Click a word to see its bytes, its label and the line that made it.',
+        + 'The PC has a frame, SP a green line, a label a dotted underline, and red marks the words the last Step instruction or Run changed. Click a word to see its bytes, its label and the line that made it.',
       'The buttons jump to each region: the PC, SP, the program, the vectors, the page the screen shows, the ROM and the devices. '
         + 'Typed `PC` or `SP`, the view follows the register as it moves. **words**, **bytes** and **instructions** read the same bits three ways: '
         + 'read as instructions, data turns into nonsense instructions, and read as bytes, an instruction shows its two halves. '
