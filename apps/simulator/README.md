@@ -73,8 +73,11 @@ deployed to GitHub Pages from `main`: **[bluedragon-ctrl.github.io/Blue11](https
   links: getting started (a first program, octal numbers, running, debugging, the usual
   mistakes), the assembler and its directives, registers, addressing modes, the instructions
   (an overview, then a page per group, with examples), the machine (memory, cycles, the stack,
-  traps, interrupts), the devices (console, line clock, display, keyboard), the ROM's
-  routines, every predefined name and a glossary, with a search. **F1 in the editor**
+  traps, interrupts), the devices (how they work, then the console, line clock, display,
+  keyboard, sound), the ROM's
+  routines, every predefined name and a glossary, with a search. Each page gives the reason
+  before the rule: why octal (an instruction taken apart), why two's complement, why a stack,
+  why cycles count memory trips, why devices have status and data registers. **F1 in the editor**
   opens it at the word under the cursor (an instruction, a register, a directive, a device
   name), and resting the mouse on one shows its entry in a tooltip. It is HackCode's help
   (`src/ui/help/` there), ported with the simulator's own text.

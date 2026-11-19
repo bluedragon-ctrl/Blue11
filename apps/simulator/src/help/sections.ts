@@ -78,7 +78,7 @@ const start: Section = {
     list(
       'The **Programs** menu starts with **First steps**: eight short programs, each adding one idea, from a single pixel to a dot you move with the keys. Open one, Step through it, change it. After them come bigger programs for the console, the display and the keyboard.',
       'Read [The big picture](computer) to see how the CPU, registers and memory work together, then [Writing assembly](assembler) and [Addressing modes](addressing). Pick [instructions](instructions) as you need them.',
-      'Make something: pixels on the [display](display), keys from the [keyboard](keyboard), text with the [ROM](rom).',
+      'Make something: pixels on the [display](display), keys from the [keyboard](keyboard), text with the [ROM](rom). [How devices work](devices) explains what they have in common.',
       'Stuck? [When something goes wrong](problems) lists the usual mistakes.',
     ),
     note('Press **F1** in the editor to look up the word under the cursor: an instruction, a register, a device name. Resting the mouse on one shows a short help. The search box above finds anything in the help, and the [glossary](glossary) explains the words it uses.'),
@@ -102,6 +102,12 @@ const octalSection: Section = {
     h('Why octal?'),
     p('**One octal digit is exactly three bits.** So you can read the bits of a number straight from its digits: `5` is 101, so `55` is 101 101. '
       + 'Computers work in bits, and the PDP-11\'s instructions are built from 3-bit fields, so octal makes the machine easy to read.'),
+    p('Here is an instruction taken apart. `MOV R1, R0` is stored as the word `010100`. Each octal digit, or pair of digits, is one part of the instruction:'),
+    table(['Digits', '`01`', '`0`', '`1`', '`0`', '`0`'], [
+      ['Means', 'MOV', 'source mode 0 (a register)', 'source register 1', 'destination mode 0', 'destination register 0'],
+    ]),
+    p('Change one part and only its digit changes: `MOV R2, R0` is `010200`, `ADD R1, R0` is `060100`. `MOV #5, R0` is `012700` and then `000005`: source mode 2 on register 7, which is how `#` works ([modes on the PC](modes)). '
+      + 'In hex (base 16) the same words are 1040 and 15C0: the parts are cut across the digits and you cannot see them. The **Listing** tab shows the words of every line, so you can take your own instructions apart.'),
     h('Bits as numbers'),
     p('Devices use single bits as switches and signals. Bit n has the value 2ⁿ. In octal these are easy to remember:'),
     table(['Bit', '0', '1', '2', '3', '4', '5', '6', '7', '15'], [
@@ -109,8 +115,9 @@ const octalSection: Section = {
     ]),
     p('So `BIS #100, @#LKS` sets bit 6 (the [line clock](clock)\'s IE), and `TSTB` tests bit 7 (`200`), the sign of a byte.'),
     h('Negative numbers'),
-    p('A word has 16 bits, so it holds 0 to 177777. To have negative numbers too, the top bit (bit 15) is taken to mean *negative*. This is called **two\'s complement**: '
-      + 'to make a number negative, invert every bit and add 1. 1 is 000001; inverted, 177776; plus 1, 177777. So 177777 is −1.'),
+    p('A word has 16 bits, so it holds 0 to 177777. Think of it as the mileage counter in a car with six octal digits. Count up from 177777 and it rolls over to 000000. Count down one from 000000 and it shows 177777. '
+      + 'So 177777 is *one less than zero*: −1, and 177776 is −2. This is called **two\'s complement**. The top bit (bit 15) tells you which half you are in: set means negative.'),
+    p('To make a number negative by hand, invert every bit and add 1. 1 is 000001; inverted, 177776; plus 1, 177777: −1 again.'),
     table(['Bits as written', 'Unsigned', 'Signed'], [
       ['`000000`', '0', '0'],
       ['`077777`', '32767.', '32767. (the largest)'],
@@ -118,7 +125,7 @@ const octalSection: Section = {
       ['`177776`', '65534.', '−2'],
       ['`177777`', '65535.', '−1'],
     ]),
-    p('The same bits are both numbers: you decide which one you mean, by the [branch](ins-branch) you use. Adding and subtracting work the same either way. '
+    p('The same bits are both numbers: you decide which one you mean, by the [branch](ins-branch) you use. This is why two\'s complement is used: adding and subtracting work the same either way, as the counter just turns forwards or backwards. The CPU needs one `ADD`, not one for signed and one for unsigned numbers. '
       + 'A byte works the same in 8 bits: 377 is −1, 200 is −128., 177 is 127.'),
     p('**Sign extension**: `MOVB` into a register copies the byte\'s top bit into the whole high byte, so the number keeps its sign. 377 (−1) becomes 177777 (−1), while 177 becomes 000177.'),
     h('Writing numbers'),
@@ -241,6 +248,21 @@ const assembler: Section = {
   id: 'assembler', title: 'Writing assembly', group: LANGUAGE,
   blocks: [
     p('The **assembler** turns your text into the words of machine code the CPU runs. Each line becomes one instruction or some data. Run assembles the program first; the **Listing** tab shows what each line became.'),
+    h('What the assembler does'),
+    p('The CPU understands only numbers. People find `MOV #5, R0` easier to read than `012700 000005`, so we write the text and let a program translate it. The Listing shows both side by side:'),
+    table(['Address', 'Words', 'Your line'], [
+      ['`001000`', '`012700 000005`', '`START:  MOV  #5, R0`'],
+      ['`001004`', '`005300`', '`1$:     DEC  R0`'],
+      ['`001006`', '`001376`', '`        BNE  1$`'],
+      ['`001010`', '`000000`', '`        HALT`'],
+    ]),
+    list(
+      'It counts the addresses for you. A label is just the address of its line: here `START` is 1000 and `1$` is 1004.',
+      'It writes the jumps for you. `BNE 1$` is stored as a distance (back 2 words), and the assembler works it out. Add a line above and every distance is worked out again. By hand you would have to fix each one.',
+      'It knows labels further down the page too, so a line can jump forward.',
+      'It does not run anything. Mistakes in the text, such as a misspelled name, are found before the program starts. Mistakes in the logic only show when it runs: that is what [debugging](debugging) is for.',
+    ),
+    h('The parts of a program'),
     code(`
       COUNT = 5                  ; a constant
       START:  MOV  #COUNT, R0    ; label, instruction, operands, comment
@@ -316,6 +338,8 @@ const bigPicture: Section = {
     h('How an instruction runs'),
     p('Your program is numbers in memory too (the **Listing** tab shows them). The CPU repeats three steps forever: **fetch** the instruction at the address in PC, move PC past it, **do** it. '
       + 'A jump or branch just puts a new address into PC. `HALT` stops the repeating.'),
+    p('Instructions and data are both just numbers in memory, and the CPU cannot tell them apart: whatever PC points at, it runs. This idea, the **stored program**, is why a program can be loaded like any data. It is also why a program needs `HALT` before its data: without it, the CPU runs the data as if it were instructions. '
+      + '[Octal numbers](octal) shows how one instruction is built from its digits.'),
     h('Follow a program'),
     p('This program takes two numbers from memory, adds them in a register, and puts the sum back in memory. Press **Step instruction** (F10) and watch PC, R0 and the word at `C` change:'),
     code(`
@@ -342,6 +366,7 @@ const bigPicture: Section = {
       '[Memory](memory): what is at which address, variables and tables.',
       '[Addressing modes](addressing): all the ways an operand can say where a number is.',
       '[The stack](stack): a pile of words for saving registers and calling subroutines.',
+      '[How devices work](devices): how the same instructions also drive the screen, the keyboard and the console.',
     ),
   ],
 };
@@ -367,6 +392,8 @@ const registers: Section = {
       ['**V** overflow', 'is wrong as a **signed** number: it did not fit in −100000…77777', '77777 + 1 = 100000: two positives gave a negative'],
       ['**C** carry', 'is wrong as an **unsigned** number: it did not fit in 0…177777. For a subtract or compare: a **borrow**, the second number was bigger', '177777 + 1 = 0'],
     ]),
+    p('**C is the carry you know from adding by hand.** In decimal, 9 + 1 with room for one digit gives 0, and you carry 1. A word has 16 bits and no room for a 17th, so the carried bit goes into C: 177777 + 1 gives 0, with C set. '
+      + '**V is the same idea for signed numbers.** A signed word goes up to 77777. One more rolls over into the negative half, so 77777 + 1 gives 100000 (−32768.): two positive numbers that add up to a negative one mean the true answer did not fit.'),
     p('The CPU does not know whether you mean your numbers as signed or unsigned, so it sets both V and C, and you pick the branch that fits: `BLT` for signed, `BLO` for unsigned ([which branch?](ins-branch)).'),
     code(`
               MOV  #3, R0
@@ -409,6 +436,9 @@ const addressing: Section = {
       END:
     `, { run: true }),
     p('The same loop with `MOVB R2, (R1)+` paints a row of pixels. The [stack](stack) uses `-(SP)` to push and `(SP)+` to pop.'),
+    h('Why modes?'),
+    p('On Blue-11, as on the PDP-11, **every operand of every instruction can use every mode**. So `ADD` can add a register, a variable, a device register or the next item of a list, and you do not need a separate instruction for each. '
+      + 'Learn a few instructions and a few modes, and they combine into almost anything. The mode is part of the instruction word: see [an instruction taken apart](octal).'),
     p('There are eight modes in all. [Addressing modes in detail](modes) goes through each one with an example, and explains **deferred**.'),
   ],
 };
@@ -540,7 +570,21 @@ const INSTRUCTION_PAGES: Array<{ id: string; title: string; lead?: Block[]; afte
   { id: 'ins-jump', title: 'Jumps and subroutines' },
   { id: 'ins-trap', title: 'Trap instructions' },
   { id: 'ins-control', title: 'CPU control and flags' },
-  { id: 'ins-eis', title: 'Multiply and divide (EIS)' },
+  {
+    id: 'ins-eis', title: 'Multiply and divide (EIS)',
+    after: [
+      p('Without EIS: multiply by ten with shifts and an add, as 10 × n = 8 × n + 2 × n.'),
+      code(`
+              MOV  #7, R0         ; n = 7
+              ASL  R0             ; 2 × n: 16
+              MOV  R0, R1         ; keep 2 × n
+              ASL  R0             ; 4 × n
+              ASL  R0             ; 8 × n: 70
+              ADD  R1, R0         ; 8 × n + 2 × n: 106, seventy
+              HALT
+      `, { run: true }),
+    ],
+  },
   { id: 'ins-other', title: 'Less common instructions' },
 ];
 
@@ -660,6 +704,8 @@ const cycles: Section = {
   id: 'cycles', title: 'Cycles and time', group: MACHINE,
   blocks: [
     p('Time on Blue-11 is counted in **cycles**. Every trip to memory costs **1 cycle**: fetching the instruction word, each extra word (an immediate, an address, an index), each operand read and each operand write. Work inside the CPU is free.'),
+    p('Why count memory trips? The CPU and memory are connected by one path, the **bus**, which carries one word at a time. Adding two registers happens inside the CPU, but every instruction and every value in memory has to come along the bus first. '
+      + 'On most computers, old and new, waiting for memory is what makes a program slow. Blue-11 makes that simple rule the whole story, so you can work out the time of a program on paper.'),
     table(['Instruction', 'Cycles'], [
       ['`MOV R1, R2`', '1'],
       ['`MOV #5, R0`', '2'],
@@ -674,6 +720,17 @@ const cycles: Section = {
     h('The budget of a frame'),
     p(`A frame is ${dec(FRAME)} cycles: 60 frames make a second of the machine's time. So a game has ${dec(FRAME)} cycles between two pictures to do everything. `
       + 'Clearing a mode 0 page with `CLR (R1)+` and `SOB` costs about 6000 cycles; drawing a character with the [ROM](rom) about 400.'),
+    h('Counting a loop'),
+    p('Count a loop by its body, then multiply. This clears the whole of page 0, 4000 words (2048.):'),
+    code(`
+              MOV  #SCREEN, R1    ; 2 cycles
+              MOV  #4000, R0      ; 2 cycles: 4000 words
+      1$:     CLR  (R1)+          ; 2 cycles: fetch, write
+              SOB  R0, 1$         ; 1 cycle
+              HALT                ; 1 cycle
+    `, { run: true }),
+    p('The loop body costs 2 + 1 = 3 cycles and runs 2048. times: 6144. cycles. With the 5 cycles around it, 6149., which is what the screen\'s line says when it stops. That is almost a third of a frame. '
+      + 'To make it faster, do more work per pass: two `CLR (R1)+` in the loop and half the count need only half as many `SOB`s, 5 cycles for 2 words instead of 6. Try it and compare.'),
     list(
       '**Step instruction** shows the cycles an instruction took in the status line; the screen\'s line shows the cycle count of the run.',
       'Keep values in registers inside a loop: a register costs nothing, a variable in memory a cycle each time.',
@@ -716,6 +773,33 @@ const stack: Section = {
       'Traps and interrupts push two words (PSW and PC); `RTI` pops them.',
       'A routine in the [ROM](rom) is called the same way, with `@#`: `JSR PC, @#DRAWCH`.',
     ),
+    h('Why a stack?'),
+    p('A subroutine can call another subroutine, which can call a third. Each one must get back to its own caller, in the opposite order: the one called **last** returns **first**. '
+      + 'A pile does exactly that: the newest return address is always on top. Here `ADD2` calls `ADD1` twice:'),
+    code(`
+              MOV  #2, R0
+              JSR  PC, ADD2       ; R0 = 4
+              HALT
+
+      ; ADD2: R0 = R0 + 2, by calling ADD1 twice.
+      ADD2:   JSR  PC, ADD1
+              JSR  PC, ADD1
+              RTS  PC
+
+      ; ADD1: R0 = R0 + 1.
+      ADD1:   INC  R0
+              RTS  PC
+    `, { run: true }),
+    table(['Running', 'SP', 'On the stack (top first)'], [
+      ['the start', '`001000`', 'nothing'],
+      ['`ADD2`', '`000776`', '`001010` (back to the `HALT`)'],
+      ['`ADD1`, the first time', '`000774`', '`001016` (back into ADD2), `001010`'],
+      ['`ADD2` again', '`000776`', '`001010`'],
+      ['`ADD1`, the second time', '`000774`', '`001022` (back into ADD2, after the second call), `001010`'],
+      ['the `HALT`', '`001000`', 'nothing: every push had its pop'],
+    ]),
+    p('Step through it with **Step instruction** and watch the **Stack** panel grow and shrink. Interrupts use the same pile, so a handler can break in at any moment and still find its way back.'),
+    p('The stack grows **down** from 1000 while the program grows **up** from 1000, so they never meet. Below 1000 there is room for 200 words (128.) before the stack reaches the [vectors](traps) at 0–377. Nothing stops it there: a stack that deep is nearly always a push without its pop, in a loop.'),
   ],
 };
 
@@ -723,6 +807,8 @@ const traps: Section = {
   id: 'traps', title: 'Traps and errors', group: MACHINE,
   blocks: [
     p('A **trap** is what the CPU does when the program makes a mistake (or asks for one with a trap instruction): it pushes the PSW and PC and continues at the address in a **vector**, a pair of words in low memory.'),
+    p('Why this way? The CPU must go *somewhere* when something goes wrong, but it cannot know your program. So the address is kept in a fixed place that your program fills in: the vector. '
+      + 'And because the old PC and PSW are saved on the [stack](stack), the handler can report the problem, fix it, or carry on as if nothing had happened. Operating systems are built on this: a program asks for a service with `TRAP`, and an error does not have to crash the whole machine.'),
     table(['Vector', 'Cause'], [
       [o(VEC.BUS_ERROR, 3), '**bus error**: a word at an odd address, an address with nothing there, a write to ROM'],
       [o(VEC.ILLEGAL, 3), '**illegal instruction**: a word that is no instruction (or `MUL` / `DIV` without EIS)'],
@@ -753,11 +839,15 @@ const interrupts: Section = {
   id: 'interrupts', title: 'Interrupts and WAIT', group: MACHINE,
   blocks: [
     p('A program can ask a device again and again whether it has something (**polling**). Or it can let the device **interrupt**: set the device\'s IE bit, and when it has something (a key, a blank, a clock tick) the CPU stops what it is doing, runs your **handler**, and then carries on where it was.'),
+    p('Think of waiting for a visitor. Polling is going to the door every minute to look. An interrupt is a doorbell: you get on with something else, and the bell calls you when someone is there. '
+      + 'Polling is simpler and fine when there is nothing else to do. Interrupts let a program do its work and still answer a device quickly.'),
+    h('How it works'),
     list(
       'Each device has a **vector**: two words in low memory, the handler\'s address and the PSW to run it with. `MOV #TICK, @#100` installs the line clock\'s.',
       'The CPU pushes the PSW and PC, and loads both from the vector. The handler ends with `RTI`, which pops them back.',
       'Interrupts come between instructions.',
-      'A handler must keep every register it uses (push and pop), since it can break in anywhere.',
+      'A handler must keep every register it uses (push and pop), since it can break in anywhere: between any two instructions of your program, which never knows it happened. If the handler changed R0, the program would find a different number in R0 for no reason it can see.',
+      'The PSW is saved for the same reason: it holds the flags. The interrupt may come between a `CMP` and its branch, and the branch must still see the flags of the `CMP`.',
       'The PSW\'s bits 7–5 are the CPU\'s **priority**. A device interrupts only above it: the console, display and keyboard at level 4, the line clock at 6. Handler PSW 340 (level 7) blocks every other interrupt while it runs.',
     ),
     table(['Vector', 'Device', 'Interrupts when'], [
@@ -790,13 +880,55 @@ const interrupts: Section = {
 
 // ------------------------------------------------------------------ Devices
 
+const devices: Section = {
+  id: 'devices', title: 'How devices work', group: DEVICES,
+  blocks: [
+    p('The console, the clock, the screen, the keyboard and the speaker are **devices**. Blue-11 has no special instructions to talk to them. '
+      + 'Instead each device has a few **registers** at fixed addresses near the top of memory, and the program reads and writes them with the same `MOV`, `TST` and `BIS` it uses on memory. This is called **memory-mapped I/O** (input and output).'),
+    code(`
+      1$:     TSTB @#XCSR         ; 1. status: is the console ready?
+              BPL  1$             ;    not yet: ask again
+              MOVB #'A, @#XBUF    ; 2. data: print an A
+              HALT
+    `, { run: true }),
+    p('A device register is not ordinary memory: reading or writing it **does** something. Writing `XBUF` prints a character, reading `RBUF` takes the typed character away, and `DSPFRM` counts up by itself. '
+      + 'This is why the debugger never reads `RBUF` or `KBDBUF` for you.'),
+    h('Status and data'),
+    p('Most devices have the same two kinds of register. A **status register** says what the device is doing, a bit for each fact. A **data register** carries the character, the key or the number. '
+      + 'The program reads the status first, and then moves the data: the two steps of the example above.'),
+    table(['Device', 'Status', 'Data'], [
+      ['[console](console), typing in', '`RCSR`', '`RBUF`'],
+      ['console, printing', '`XCSR`', '`XBUF`'],
+      ['[line clock](clock)', '`LKS`', '(none: a tick is the news)'],
+      ['[display](display-frames)', '`DSPCS`', 'the pixel memory, `DSPFRM`, `DSPPAL`'],
+      ['[keyboard](keyboard-events)', '`KBDCS`', '`KBDBUF`, the key map `KBDKEY`'],
+      ['[speaker](sound)', '(none: it never makes you wait)', '`SNDCS` (the speaker\'s bit), `SNDDIV`'],
+    ]),
+    p('The status bits are in the same places on every device that has them, so you learn them once:'),
+    list(
+      '**Bit 7, DONE or READY**: the device has something for you, or is ready for more. Bit 7 is the sign of a byte, so `TSTB` puts it in the N flag, and `BPL` (wait while clear) or `BMI` tests it without a [mask](ins-logic).',
+      '**Bit 6, IE** (interrupt enable): set it and the device [interrupts](interrupts) instead of waiting to be asked.',
+    ),
+    h('Two ways to wait'),
+    p(`A device is often much slower than the CPU, or has nothing yet: a key comes when a person presses it, the next frame after ${dec(FRAME)} cycles. So the program has to wait. There are two ways:`),
+    table(['', '**Polling**', '**Interrupts**'], [
+      ['How', 'a loop asks the status again and again', 'set IE; the device calls your handler'],
+      ['Good for', 'short, simple programs that have nothing else to do', 'programs that do other work, or several devices at once'],
+      ['Costs', 'the CPU is busy asking', 'a vector, a handler, saving registers'],
+    ]),
+    note('**Always `@#`** with a device register: `TSTB @#XCSR`. Without the `@#`, `XCSR` is assembled as a variable next to your program, and the device never hears from you. See [addressing](addressing).'),
+    p('The console and the line clock are copies of real PDP-11 boards (DEC\'s DL11 and KW11-L). The display, keyboard and speaker are Blue-11\'s own, built in the same style.'),
+  ],
+};
+
 const consoleSection: Section = {
   id: 'console', title: 'Console', group: DEVICES,
   blocks: [
     p('The console is a text terminal: it prints what the program writes, and passes on text typed on it (it is DEC\'s DL11). '
       + 'It is the **Console** panel. Click it (or the screen) and type: each character goes to `RBUF`.'),
     h('Printing'),
-    p('The console prints one character at a time and needs a moment for each. So: wait until bit 7 of `XCSR` (READY) is set, then write the character to `XBUF`:'),
+    p('A device takes its characters one at a time, and may still be busy with the last one. A real terminal on the PDP-11 printed about 10 characters a second, while the CPU could run thousands of instructions in that time. '
+      + 'So the rule is: wait until bit 7 of `XCSR` (READY) is set, then write the character to `XBUF`. In the simulator the console is always ready at once, but a program that checks also works on a slower line, so make it a habit:'),
     code(`
               MOV  #MSG, R1
       1$:     MOVB (R1)+, R0      ; next character
@@ -879,7 +1011,9 @@ const display: Section = {
 const displayFrames: Section = {
   id: 'display-frames', title: 'Display: frames and pages', group: DEVICES,
   blocks: [
-    p(`Every ${dec(FRAME)} cycles comes a **vertical blank**: the moment the display starts a new picture. It takes the page and the [palette](palette) as they are, adds 1 to \`DSPFRM\`, and sets DONE in \`DSPCS\`. `
+    p('An old monitor (a CRT) draws its picture with a beam of electrons that sweeps the screen row by row, from top to bottom, 60 times a second. After the last row the beam goes back to the top, and for a moment it draws nothing: the **vertical blank**. '
+      + 'That is the safe moment to change the picture, as nothing is being drawn.'),
+    p(`On Blue-11 it comes every ${dec(FRAME)} cycles. The display takes the page and the [palette](palette) as they are, adds 1 to \`DSPFRM\`, and sets DONE in \`DSPCS\`. `
       + 'A game draws once per frame by waiting for it:'),
     code(`
       ; VSYNC: wait for the next vertical blank.
@@ -988,7 +1122,8 @@ const NOTES: Array<[string, number, number]> = [
 const sound: Section = {
   id: 'sound', title: 'Sound: the speaker', group: DEVICES,
   blocks: [
-    p('The speaker is **one bit**: it is either out or in. To make a note, the program moves it out and in again, over and over. '
+    p('Sound is air pushed and pulled, many times a second. The faster it goes back and forth, the higher the note: 440 times a second is the A that orchestras tune to. A speaker makes sound by moving its cone out and in. '
+      + 'Blue-11\'s speaker is **one bit**: it is either out or in. To make a note, the program moves it out and in again, over and over. That gives a *square wave*: buzzy, like an old game, but a clear note. '
       + 'How many cycles pass between two moves sets the pitch, so here the [cycles](cycles) of your loop are something you hear.'),
     p(`The machine runs ${dec(60 * FRAME)} cycles a second, so a note of f Hz moves the speaker every ${dec(60 * FRAME)} / (2 × f) cycles: its **half period**.`),
     table(['Note', 'Hz', 'Half period (cycles)'], NOTES.map(([n, hz, half]) => [n, hz.toFixed(1), `\`${dec(half)}\` (${o(half, 1)})`])),
@@ -1090,10 +1225,11 @@ const glossary: Section = {
       e('gl-carry', [], 'Carry (C), overflow (V)', 'Flags for a result that did not fit: C as an unsigned number, V as a signed one. See [flags](registers).'),
       e('gl-cycle', [], 'Cycle', 'One trip to memory: the unit of time. See [cycles](cycles).'),
       e('gl-deferred', [], 'Deferred (indirect)', 'An operand whose value is an **address**: the CPU goes there and takes the word it finds. Written with `( )` or `@`: `(R1)`, `@(R1)+`, `@#DSPCS`. See [deferred](modes).'),
-      e('gl-device', [], 'Device, device register', 'A part of the machine besides the CPU and memory: the console, clock, display, keyboard. Programs talk to it through its registers, words at fixed addresses: `@#DSPCS`.'),
+      e('gl-device', [], 'Device, device register', 'A part of the machine besides the CPU and memory: the console, clock, display, keyboard. Programs talk to it through its registers, words at fixed addresses: `@#DSPCS`. See [how devices work](devices).'),
       e('gl-directive', [], 'Directive', 'A line for the assembler, not the CPU, starting with a dot: `.WORD`. See [directives](directives).'),
       e('gl-double', [], 'Double buffering', 'Drawing on a page that is not shown, then showing it, so the picture never shows half a drawing. See [frames and pages](display-frames).'),
       e('gl-eis', [], 'EIS', 'The *Extended Instruction Set*: `MUL`, `DIV`, `ASH`, `ASHC`. A setting turns it on. See [multiply and divide](ins-eis).'),
+      e('gl-fetch', [], 'Fetch, execute', 'The CPU\'s endless loop: read the instruction at PC, move PC past it, do it, and again. See [the big picture](computer).'),
       e('gl-flag', [], 'Flag', 'One of the four bits N Z V C that describe the last result. Branches test them. See [flags](registers).'),
       e('gl-frame', [], 'Frame', `${dec(FRAME)} cycles, one picture on the screen, a 60th of a second.`),
       e('gl-handler', [], 'Handler', 'The code that runs on an interrupt or a trap. It ends with `RTI`.'),
@@ -1107,6 +1243,7 @@ const glossary: Section = {
       e('gl-lc', [], 'Location counter `.`', 'The address the assembler is writing at. `. = 2000` moves it. See [Writing assembly](assembler).'),
       e('gl-lowbyte', [], 'Low byte first', 'How a word sits in memory: its low 8 bits at the even address, its high 8 bits at the next one. See [memory](memory).'),
       e('gl-machinecode', [], 'Machine code', 'The numbers the CPU actually runs. The **Listing** tab shows the words each line became.'),
+      e('gl-mmio', [], 'Memory-mapped I/O', 'Devices that look like memory: their registers have addresses, so `MOV` and `TST` talk to them as to any word. See [how devices work](devices).'),
       e('gl-mask', [], 'Mask', 'A number whose 1 bits pick the bits to test, set or clear: `BIT #200, R0`.'),
       e('gl-mode', [], 'Addressing mode', 'How an operand says where its value is: `R0`, `#5`, `(R1)+`, `@#DSPCS`. See [addressing](addressing) and [in detail](modes).'),
       e('gl-octal', [], 'Octal', 'Base 8. Blue-11\'s numbers are octal unless they end in a dot. See [numbers](octal).'),
@@ -1124,6 +1261,7 @@ const glossary: Section = {
       e('gl-sign', [], 'Signed, unsigned', 'The same 16 bits read as 0 to 177777 (unsigned), or with the top bit meaning negative (signed): 177777 is 65535. or −1. See [negative numbers](octal).'),
       e('gl-signext', [], 'Sign extension', 'Copying a byte\'s top bit into the high byte when `MOVB` puts it in a register, so a negative byte stays negative: 377 becomes 177777. See [negative numbers](octal).'),
       e('gl-sp', [], 'SP (stack pointer)', 'Register R6: the address of the top of the stack. See [registers](registers#reg-SP).'),
+      e('gl-stored', [], 'Stored program', 'The idea that a program is numbers in memory, like its data. The CPU runs whatever PC points at. See [the big picture](computer).'),
       e('gl-stack', [], 'Stack, push, pop', 'A pile of words in memory that SP points at: push puts a word on top, pop takes the top one off. See [the stack](stack).'),
       e('gl-subroutine', [], 'Subroutine', 'Code called with `JSR PC` that returns with `RTS PC`. See [the stack](stack).'),
       e('gl-tearing', [], 'Tearing', 'Part of the screen showing the old picture and part the new, because the program drew while the beam was reading. See [the beam](display-frames#dsp-beam).'),
@@ -1140,7 +1278,7 @@ const SECTIONS_NO_INDEX: Section[] = [
   bigPicture, registers, memory, addressing, modes, stack,
   instructions, ...instructionPages,
   cycles, traps, interrupts,
-  consoleSection, clock, display, displayFrames, palette, keyboard, keyboardEvents, sound, rom,
+  devices, consoleSection, clock, display, displayFrames, palette, keyboard, keyboardEvents, sound, rom,
 ];
 
 /** Every predefined name with its value and where it is described. */

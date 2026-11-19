@@ -35,7 +35,8 @@ export const OP_GROUPS: OpGroup[] = [
   {
     section: 'ins-move',
     title: 'Moving data',
-    intro: 'A **(B)** in the name means the instruction has a byte form too: `MOV` copies a word, `MOVB` a byte.',
+    intro: 'Most of a program is moving data: into registers to work on, back to memory to keep, out to a device to show. `MOV` is the most used instruction of all. It **copies**: the source keeps its value. '
+      + 'A **(B)** in the name means the instruction has a byte form too: `MOV` copies a word, `MOVB` a byte.',
     ops: [
       wb('MOV', 'MOV src, dst', '**0-', 'Copy `src` to `dst`. `MOV #5, R0` puts 5 into R0. `MOVB` into a register **sign-extends** ([why](octal)): the byte 377 becomes 177777 (−1).'),
       wb('CLR', 'CLR dst', '0100', 'Set `dst` to 0.'),
@@ -46,7 +47,8 @@ export const OP_GROUPS: OpGroup[] = [
   {
     section: 'ins-arith',
     title: 'Arithmetic',
-    intro: 'Numbers are 16-bit words: 0 to 177777 (65535.) unsigned, or −100000 to 77777 (−32768. to 32767.) signed. A result that does not fit wraps around, and a flag tells you: **C** (carry) for unsigned numbers, **V** (overflow) for signed ones.',
+    intro: 'Numbers are 16-bit words: 0 to 177777 (65535.) unsigned, or −100000 to 77777 (−32768. to 32767.) signed. A result that does not fit wraps around, and a flag tells you: **C** (carry) for unsigned numbers, **V** (overflow) for signed ones ([why](registers)). '
+      + 'Comparing is subtracting: `CMP` works out the difference only to set the flags, and throws the result away. A zero difference means equal, a negative one means less.',
     ops: [
       op('ADD', 'ADD src, dst', '****', '`dst` = `dst` + `src`.'),
       op('SUB', 'SUB src, dst', '****', '`dst` = `dst` − `src`. C is set on a borrow (`src` was bigger, unsigned).'),
@@ -72,7 +74,8 @@ export const OP_GROUPS: OpGroup[] = [
   {
     section: 'ins-logic',
     title: 'Shifts and rotates',
-    intro: 'Move every bit one place left or right. The bit that falls off the end goes into C. (V is set to N xor C.)',
+    intro: 'Move every bit one place left or right. The bit that falls off the end goes into C. (V is set to N xor C.) '
+      + 'In decimal, writing a 0 after a number multiplies it by ten: 25 becomes 250. In binary, shifting left one place multiplies by two, and shifting right divides by two. Shifts are the cheap way to multiply and divide by 2, 4, 10 (eight)….',
     ops: [
       wb('ASL', 'ASL dst', '****', 'Shift left, 0 comes in: multiply by 2.'),
       wb('ASR', 'ASR dst', '****', 'Shift right, the sign bit is kept: divide a signed number by 2, rounding down.'),
@@ -108,7 +111,8 @@ export const OP_GROUPS: OpGroup[] = [
   {
     section: 'ins-jump',
     title: 'Jumps and subroutines',
-    intro: '`JMP` goes somewhere else for good. `JSR` calls a subroutine, which comes back with `RTS`. See [the stack](stack) for how a call remembers where to return.',
+    intro: '`JMP` goes somewhere else for good. `JSR` calls a subroutine, which comes back with `RTS`. '
+      + 'A subroutine can be called from many places, so it cannot know where to go back to: `JSR` remembers the place for it, on the stack. See [the stack](stack) for how.',
     ops: [
       op('JMP', 'JMP dst', '----', 'Jump to the address of `dst`: `JMP LOOP`, or through a table: `JMP @TABLE(R1)`. A register as `dst` (`JMP R0`) is illegal and traps.'),
       op('JSR', 'JSR R, dst', '----', 'Call a subroutine: push `R`, put the return address in `R`, jump to `dst`. Nearly always `JSR PC, NAME`, which just pushes the return address.'),
@@ -141,7 +145,8 @@ export const OP_GROUPS: OpGroup[] = [
   {
     section: 'ins-eis',
     title: 'Multiply and divide (EIS)',
-    intro: 'The **EIS** instructions (the Extended Instruction Set) work only with the **EIS** setting on; without it they trap to 10 ([illegal instruction](traps)), as on a machine without the option. '
+    intro: 'Multiplying and dividing take a lot of circuits, which were expensive in the 1970s, so on the PDP-11 they came as an option you paid extra for. '
+      + 'The **EIS** instructions (the Extended Instruction Set) work only with the **EIS** setting on; without it they trap to 10 ([illegal instruction](traps)), as on a machine without the option. '
       + 'Without EIS, multiply by shifting and adding (the `DIV16` routine in the examples divides that way). `R` must be a register; an even one (R0, R2, R4) holds a 32-bit value in `R` (high word) and `R+1` (low).',
     ops: [
       op('MUL', 'MUL src, R', '**0*', '`R` × `src`, signed. With an even `R` the 32-bit product is in `R`:`R+1`, with an odd one only its low word. C: the product needs more than 16 bits.'),
