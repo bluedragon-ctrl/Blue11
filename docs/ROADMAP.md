@@ -48,7 +48,12 @@ README as a departure from the original machine.
    that links resolve, and that the examples assemble and run. Then made more approachable:
    short pages (instructions a page per group, the display and keyboard split, running and
    debugging apart), a first-program walk-through, octal numbers, the usual mistakes, a
-   glossary, more small examples whose results are tested, and Previous / Next links.
+   glossary, more small examples whose results are tested, and Previous / Next links. Then
+   the reason before the rule (2026-11-19): an instruction taken apart into its octal fields,
+   two's complement as a counter that rolls over, what the assembler does, the stored program,
+   carry and overflow, why a stack (nested calls traced), why cycles count memory trips,
+   why vectors, and a page on how devices work (memory-mapped I/O, status and data registers,
+   polling or interrupts).
 6. **Review fixes** (`blue11` 0.4.0, 2026-11-18): a review of the CPU, the assembler and the
    devices found these, each now with a test:
    - ~~`HALT` in user mode stopped the machine under `protectModes`~~: it traps to 4
@@ -126,25 +131,53 @@ README as a departure from the original machine.
     3. **An expression box** in the same tab: `<DSPCS+2>`, `-1`, `100./3`, `'A+1`, with the
        program's labels, shown in every base. Evaluated by the assembler itself (the program
        plus `.WORD <expr>`), so the public API needs nothing new.
-14. **Conditional assembly and repetition:** `.IF` / `.IFF` / `.IFT` / `.ENDC` with `EQ NE GT
+14. **Teaching tools in the simulator** (only the simulator; the library's public API is
+    enough). The help, First steps and the debugger explain the language; these give a student
+    practice with feedback, and help at the moment they are confused. One PR each, in order:
+    1. **Exercises that check themselves.** A task, a starter program and a **Check** button:
+       Check runs the student's program several times with different data (the words at a
+       label, the console's input, keys at given cycles) and compares registers, memory, what
+       it printed or the pixels it drew, so a program that only writes the expected answer
+       fails. A wrong answer says what was expected and what came, with a hint. About three
+       after each First steps program (sum a list, find the largest word, print R0 in octal,
+       reverse a text, draw a box, move a dot with the keys), progress kept in the browser.
+       The checker has no DOM (like `src/sim.ts`) and is tested: each exercise's model
+       solution passes, and a wrong one fails with the message promised.
+    2. **What just happened.** After Step instruction, one plain sentence about the
+       instruction with the student's own numbers: *`MOV (R1)+, R0`: read the word at 001022
+       (where R1 points), 000005, into R0; then R1 went 001022 → 001024. N0 Z0 V0, C
+       unchanged.* From the CPU's access hook (`onAccess`), installed only while stepping.
+       It shows addressing modes working, the hardest idea in the language.
+    3. **Step back.** Back one instruction, by running again from the boot (with the input
+       log) to the instruction before; snapshots every so many frames if that is too slow.
+       Runs are exact, so the past is the same past.
+    4. **Name the likely mistake, in the student's terms.** Before a run, a simulator-only
+       check (the library's assembler stays the original's) marks the mistakes the help lists:
+       a device name without `@#` (`MOV DSPCS, R0`: "did you mean `@#DSPCS`?"), code that runs
+       into `.WORD` data with no `HALT` or jump before it, words after `.ASCII` / `.BYTE` with
+       no `.EVEN`, an instruction that changes the flags between a `CMP` and its branch. After
+       a trap, the message points at the line and its probable cause: the PC in data after a
+       label ("a missing `HALT`?"), an odd register ("a `.EVEN` missing after a text?"), SP
+       below the vectors ("a push without its pop?").
+15. **Conditional assembly and repetition:** `.IF` / `.IFF` / `.IFT` / `.ENDC` with `EQ NE GT
     LT GE LE DF NDF`, `.IIF`, and `.REPT` / `.ENDR`. Small, self-contained, and they let the
     ROM and the examples drop copy-pasted tables.
-15. **Macros:** `.MACRO` / `.ENDM` with arguments, default values and `.NARG`, then `.IRP` /
+16. **Macros:** `.MACRO` / `.ENDM` with arguments, default values and `.NARG`, then `.IRP` /
     `.IRPC`. The largest gap from the original assembler; listings show expansions as the
     original does. Needs a design note in `BLUE11_MACHINE.md` §3 first (what of `.MCALL` the
     predefined symbols replace).
-16. **More of the /40 and its successors' instructions**, each as an option like `eis`: `SPL`
+17. **More of the /40 and its successors' instructions**, each as an option like `eis`: `SPL`
     and `MTPS` / `MFPS` (a priority change that works under `protectModes`), and `MARK`.
-17. **`.INCLUDE`** through a host callback (`options.include(name) → source`), so the
+18. **`.INCLUDE`** through a host callback (`options.include(name) → source`), so the
     simulator's ROM routines and a host's library can be shared without pasting. The library
     stays free of file I/O.
-18. **A differential test against SIMH:** random instruction sequences, compared register by
+19. **A differential test against SIMH:** random instruction sequences, compared register by
     register and flag by flag with traces from SIMH's /40 model (with EIS), checked in as
     fixtures. It pins down the corners: `ASH` / `ASHC` overflow, `DIV` overflow, `SBC` / `ADC`
     flags, the order of side effects in `JSR R, @(R)+` and `MOV R, (R)+`.
-19. **Documented restart rules for hosts:** when `onTrap` stops on a fault, the PC is set back
+20. **Documented restart rules for hosts:** when `onTrap` stops on a fault, the PC is set back
     but autoincrement and autodecrement have already happened. Say so in the README, and
     consider an option to undo them (the /45's `SSR1` records exactly this).
-20. **Later, if wanted:** a third display mode (such as 128 × 128 at 1 bpp), a mouse, more keys,
+21. **Later, if wanted:** a third display mode (such as 128 × 128 at 1 bpp), a mouse, more keys,
    and a shared UI package for the debugger panels HackCode and the simulator have in common
    (extracted only once both exist).
