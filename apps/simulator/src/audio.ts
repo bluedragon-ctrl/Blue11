@@ -32,7 +32,7 @@ function outShare(level: 0 | 1, edges: readonly Edge[], start: number, a: number
  * Samples run on from chunk to chunk; `skip` jumps over time not played.
  */
 export class Resampler {
-  /** Cycles per sample: 25 at 48 kHz and real time. */
+  /** Cycles per sample: 25 at 48 kHz and the machine's native speed. */
   private stepCycles: number;
   /** The cycle where the next sample starts (fractional). */
   private pos = 0;
@@ -50,7 +50,7 @@ export class Resampler {
   get step(): number { return this.stepCycles; }
 
   /**
-   * The machine's speed against the wall clock, in cycles per second: away from real time
+   * The machine's speed against the wall clock, in cycles per second: away from its native speed
    * (1200000) the sound plays slower and lower, or faster and higher, like a tape.
    */
   set cyclesPerSecond(c: number) { this.stepCycles = c / this.sampleRate; }

@@ -218,8 +218,8 @@ Index 0 is black, so a cleared screen is black in both modes.
   screen refresh and the tick are different things (pictures, and timing) that happen to be
   equal; the library already keeps them apart (`SimpleMachine`'s `clockCycles` defaults to
   `frameCycles` only when not given).
-- **The simulator's speed slider** is a multiple of real time, the CPU clock's rate (1.2 M
-  cycles a second), never `frameCycles`, so a program behaves the same at every speed.
+- **The simulator's speed slider** is in machine cycles per second of wall time (1.2 M is the
+  machine's native speed), never `frameCycles`, so a program behaves the same at every speed.
 
 ### 5.1 The scanning beam: tearing, as an option
 

@@ -1,10 +1,10 @@
 /**
  * The simulated computer's three rates, all in CPU cycles. They are separate things that start
- * out in step: the CPU clock is what "real time" means; the screen refresh and the line clock
+ * out in step: the CPU clock is the machine's native speed; the screen refresh and the line clock
  * are devices that count its cycles.
  */
 
-/** The CPU clock: cycles per second of machine time. At real time, the page runs this many a second. */
+/** The CPU clock: cycles per second of machine time. At its native speed, the page runs this many a second. */
 export const CPU_HZ = 1_200_000;
 
 /** Screen refresh: cycles per display frame, from one vertical blank to the next (60 Hz). */

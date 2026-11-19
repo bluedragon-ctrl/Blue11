@@ -5,7 +5,7 @@
  * the ROM, the examples and saved programs, sharing by URL, the input log, and the help.
  *
  * The machine runs whole screen frames paced by animation frames, as many as the speed setting
- * (a multiple of real time, the CPU clock's rate) makes the wall time worth. That is the only
+ * (machine cycles per second of wall time) makes the wall time worth. That is the only
  * use of wall-clock time, with the speaker's scheduling
  * (src/speaker.ts), and it never reaches the simulation (src/sim.ts), whose time is cycles.
  */
@@ -21,7 +21,7 @@ import {
 } from './debug';
 import { breakpointLines, debugExtensions, setErrors, setHeat, setPcLine, toggleBreakpointAtCursor } from './editor';
 import { lastHalfPeriod } from './audio';
-import { cyclesPerSecondAt, REAL_TIME, SPEEDS, speedLabel, speedShort } from './speed';
+import { NATIVE, SPEEDS, speedLabel, speedShort } from './speed';
 import { CPU_HZ } from './time';
 import { HELP, inComment, wordAt } from './help';
 import { helpTooltip } from './help/tooltip';
@@ -251,14 +251,14 @@ export function startPage(): void {
     const r = settingsDialog.getBoundingClientRect();
     if (ev.target === settingsDialog && (ev.clientX < r.left || ev.clientX > r.right || ev.clientY < r.top || ev.clientY > r.bottom)) settingsDialog.close();
   });
-  // Away from real time, the gear says so: the speed is out of sight.
+  // Away from the machine's native speed, the gear says so: the speed is out of sight.
   const speedBadge = $('speed-badge');
   const speedText = $('speed-text');
-  /** The speed: a multiple of real time. */
-  const rate = () => SPEEDS[Number(speed.value)] ?? REAL_TIME;
+  /** The speed: machine cycles per second of wall time. */
+  const rate = () => SPEEDS[Number(speed.value)] ?? NATIVE;
   function showSpeed(): void {
     speedText.textContent = speedLabel(rate());
-    speedBadge.hidden = rate() === REAL_TIME;
+    speedBadge.hidden = rate() === NATIVE;
     speedBadge.textContent = speedShort(rate());
     try { browserStorage()?.setItem('blue11.sim.speed', speed.value); } catch { /* off */ }
   }
@@ -408,7 +408,7 @@ export function startPage(): void {
   function tick(now: number): void {
     if (!running) return;
     // The machine's cycles this wall time is worth, in whole screen frames.
-    owed = Math.min(owed + ((now - lastTime) / 1000) * cyclesPerSecondAt(rate()) / sim.frameCycles, 50);
+    owed = Math.min(owed + ((now - lastTime) / 1000) * rate() / sim.frameCycles, 50);
     lastTime = now;
     syncBreakpoints();
     const until = performance.now() + BUDGET_MS;
@@ -417,7 +417,7 @@ export function startPage(): void {
       owed -= 1;
       const r = sim.runFrame(resumeNext);
       resumeNext = false;
-      speaker.play(sim.takeSound(), cyclesPerSecondAt(rate()));
+      speaker.play(sim.takeSound(), rate());
       if (r.stop !== 'frame') stopped(r);
       if (performance.now() > until) { owed = 0; break; }
     }

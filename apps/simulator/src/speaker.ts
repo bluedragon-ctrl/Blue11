@@ -46,7 +46,7 @@ export class Speaker {
 
   /**
    * Play a chunk of the speaker, right after the last one, with the machine running at
-   * `cyclesPerSecond` of wall time: away from real time it is slower and lower, or faster and higher.
+   * `cyclesPerSecond` of wall time: below the machine's native speed it is slower and lower, or faster and higher.
    */
   play(chunk: SoundChunk, cyclesPerSecond: number): void {
     if (!this.ctx || !this.resampler || !this.gain) return;

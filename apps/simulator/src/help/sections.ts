@@ -146,7 +146,7 @@ const running: Section = {
     h('Time and speed'),
     p(`The machine's time is counted in **cycles**: its CPU clock runs ${dec(CPU_HZ)} a second. A cycle is one trip to memory, so a short instruction costs 1–3 [cycles](cycles). `
       + `Two devices count those cycles, each at its own rate: the [display](display) refreshes the screen every ${dec(FRAME)} cycles (a **frame**, ${CPU_HZ / FRAME} a second), and the [line clock](clock) **ticks** every ${dec(TICK)} cycles (${CPU_HZ / TICK} a second). The two are the same today, but they are different things: the screen is for pictures, the tick for timing. `
-      + '**Speed** (in **Settings**, the ⚙ next to Help) says how fast the machine\'s time runs against **real time**, the CPU clock\'s own rate: from 1/60 of real time to 10× real time. A program behaves exactly the same at every speed: only you see (and hear) it faster or slower.'),
+      + '**Speed** (in **Settings**, the ⚙ next to Help) says how many of the machine\'s cycles run per second of your time: from 20 k to 12 M cycles/s. At **1.2 M cycles/s**, the machine\'s native speed, the screen and the line clock run at 60 a second. A program behaves exactly the same at every speed: only you see (and hear) it faster or slower.'),
     h('Typing into your program'),
     p('Click the screen or the console first: the label says *keyboard → program*. Now every key goes to the program: to the [keyboard](keyboard) device, and a key that types a character also to the [console](console). '
       + 'Ctrl and Cmd shortcuts stay with the browser. Clicking elsewhere releases every key.'),
@@ -1031,7 +1031,7 @@ const sound: Section = {
     entries(...symbolEntries('SNDCS', 'SNDDIV')),
     h('In the simulator'),
     list(
-      'Turn **Sound** on in **Settings** (the ⚙ next to Help). At **real time** (the middle of **Speed**) a note plays at its true pitch. At other speeds the sound plays like a tape at the wrong speed: at 1/2 of real time an octave lower and twice as long, at 2× an octave higher; very slow, a note breaks up into clicks, one per switch of the speaker. Paused and stepping, it is silent.',
+      'Turn **Sound** on in **Settings** (the ⚙ next to Help). At **1.2 M cycles/s**, the machine\'s native speed (the middle of **Speed**), a note plays at its true pitch. At other speeds the sound plays like a tape at the wrong speed: at 600 k cycles/s an octave lower and twice as long, at 2.4 M an octave higher; very slow, a note breaks up into clicks, one per switch of the speaker. Paused and stepping, it is silent.',
       'The **Sound** tab draws the speaker over the last frame against a ruler in cycles, and the last half period it measured: you can see a note without hearing it.',
       'A program that prints character 7 (BEL) on the [console](console) rings the bell.',
       'In the Examples menu, under Sound: the **A beeper note**, **A scale**, **A tune** and **Play and draw** examples.',
