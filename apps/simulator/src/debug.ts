@@ -313,3 +313,33 @@ export function memoryMapRgba(words: Int32Array, layout: MemoryLayout, out: Uint
     out[o + 3] = 255;
   }
 }
+
+// ---------------------------------------------------------------- pixels and addresses
+
+/** Where a pixel of the screen is in memory (display spec §3). */
+export interface PixelSpot {
+  x: number;
+  y: number;
+  /** The byte that holds it. */
+  address: number;
+  /** Mode 1: which half of the byte (the even x in the low half, bits 3–0). Mode 0: null. */
+  half: 'low' | 'high' | null;
+}
+
+/** The first byte of a page: mode 0 has pages 0–3 of 10000 bytes, mode 1 pages 0–1 of 20000. */
+export const pageBase = (mode: number, page: number) => 0o120000 + (mode ? (page & 1) * 0o20000 : (page & 3) * 0o10000);
+
+/** The byte of pixel (x, y) on a page shown in a mode: `page + y*100 + x` (mode 1: `x/2`). */
+export function pixelAddress(x: number, y: number, mode: number, page: number): PixelSpot {
+  return { x, y, address: pageBase(mode, page) + y * 0o100 + (mode ? x >> 1 : x), half: mode ? (x & 1 ? 'high' : 'low') : null };
+}
+
+/**
+ * The pixels a word of memory holds on the page shown: the first (x, y) and how many, side by
+ * side on one row (2 in mode 0, 4 in mode 1). Null if the word is not on that page.
+ */
+export function pixelsOfWord(address: number, mode: number, page: number): { x: number; y: number; n: number } | null {
+  const off = (address & 0xfffe) - pageBase(mode, page);
+  if (off < 0 || off >= (mode ? 0o20000 : 0o10000)) return null;
+  return { x: (off & 0o77) * (mode ? 2 : 1), y: off >> 6, n: mode ? 4 : 2 };
+}

@@ -16,7 +16,7 @@ import { frameToRgba, keyCode, octal, type AsmError, type Frame } from 'blue11';
 import { blue11Asm, blue11Highlight } from 'blue11/codemirror';
 import {
   addressNamer, charOf, disassemblyAround, explorerInstructions, explorerRows, inRom, lineHeat, MAP_COLS, MAP_ROWS, mapAddress,
-  mapCell, memoryLayout, memoryMapRgba, memoryRows, memorySnapshot, parseAddress, READ_TAKES, regionOf, registerText, ROW_WORDS, stackRows, vectorName, type MemCell, type Role,
+  mapCell, memoryLayout, memoryMapRgba, memoryRows, memorySnapshot, parseAddress, pixelAddress, pixelsOfWord, READ_TAKES, regionOf, registerText, ROW_WORDS, stackRows, vectorName, type MemCell, type PixelSpot, type Role,
 } from './debug';
 import { breakpointLines, debugExtensions, setErrors, setHeat, setPcLine, toggleBreakpointAtCursor } from './editor';
 import { CYCLES_PER_SECOND, lastHalfPeriod, shouldPlay } from './audio';
@@ -571,6 +571,8 @@ export function startPage(): void {
   const mxAddr = $<HTMLInputElement>('mx-addr');
   const mxAs = $<HTMLSelectElement>('mx-as');
   let picked: number | null = null;
+  /** The pixel the word was picked from on the screen (Shift+click), if it was. */
+  let pickedPixel: PixelSpot | null = null;
 
   /** The first address the explorer shows: what is typed (a register follows it), else the program. */
   function explorerStart(): number | null {
@@ -578,7 +580,7 @@ export function startPage(): void {
     if (!mxAddr.value.trim()) return prog ? prog.origin : 0o1000;
     return parseAddress(mxAddr.value, prog?.symbols ?? new Map(), sim.cpu.r);
   }
-  function goTo(text: string): void { mxAddr.value = text; picked = null; setView('memory'); }
+  function goTo(text: string): void { mxAddr.value = text; picked = null; pickedPixel = null; setView('memory'); }
   function scrollExplorer(bytes: number): void {
     const at = explorerStart();
     if (at === null) return;
@@ -601,6 +603,7 @@ export function startPage(): void {
     const v = vectorName(c.address);
     if (v && r.region === 'vectors') parts.push(`vector of ${v}`);
     if (c.role) parts.push(ROLE_TEXT[c.role]);
+    if (r.region === 'pixels') parts.push(pixelsText(c.address));
     const src = layout?.source(c.address);
     if (src) parts.push(`${src.rom ? 'rom.mac ' : ''}line ${src.line}`);
     if (c.address === sim.cpu.r[7]) parts.push('PC points here');
@@ -609,10 +612,24 @@ export function startPage(): void {
     return parts.join(' · ');
   }
 
+  /** The pixels a word of pixel memory holds, in the mode shown: on which page, and if it is shown. */
+  function pixelsText(address: number): string {
+    const { mode, page } = screenShown;
+    for (let p = 0; p < (mode ? 2 : 4); p++) {
+      const w = pixelsOfWord(address, mode, p);
+      if (w) {
+        const at = (x: number) => `(${octal(x, 1)}, ${octal(w.y, 1)})`;
+        return `pixels ${at(w.x)}–${at(w.x + w.n - 1)} of page ${p} in mode ${mode}${p === (mode ? page & 1 : page) ? ', the page shown' : ''}`;
+      }
+    }
+    return '';
+  }
+
   let layout: ReturnType<typeof memoryLayout> | null = null;
   function showExplorer(): void {
     const prog = sim.program;
     const cpu = sim.cpu;
+    screenShown = shownScreen();
     const at = explorerStart();
     mxAddr.classList.toggle('bad', at === null);
     const box = $('mx-rows');
@@ -629,6 +646,7 @@ export function startPage(): void {
       + (c.address === pc ? ' pc' : '') + (c.address === sp ? ' sp' : '') + (c.address === picked ? ' picked' : '');
     const pick = (c: MemCell) => (e: Event) => {
       picked = c.address;
+      pickedPixel = null;
       e.stopPropagation();
       show();
     };
@@ -660,6 +678,11 @@ export function startPage(): void {
           const cell = document.createElement('span');
           cell.className = cls(c) + (c.was !== undefined ? ' changed' : '') + (c.name ? ' named' : '');
           cell.textContent = v === null ? (bytes ? '--- ---' : '------') : bytes ? `${octal(v & 0xff, 3)} ${octal(v >> 8, 3)}` : octal(v);
+          if (bytes && v !== null && pickedPixel && (pickedPixel.address & ~1) === c.address) {
+            // the byte the pixel is in, and in mode 1 its half
+            const b = (lo: boolean) => Object.assign(document.createElement('span'), { className: lo === !(pickedPixel!.address & 1) ? 'pbyte' : '', textContent: octal(lo ? v & 0xff : v >> 8, 3) });
+            cell.replaceChildren(b(true), ' ', b(false));
+          }
           cell.title = cellText(c);
           cell.addEventListener('click', pick(c));
           if (c.address === picked) showDetail(c);
@@ -740,6 +763,7 @@ export function startPage(): void {
     // a few rows before it, so that it is near the top
     mxAddr.value = octal(Math.max(0, Math.min(0o200000 - MX_ROWS * 2 * ROW_WORDS, (a & ~0o17) - 4 * 2 * ROW_WORDS)));
     picked = a;
+    pickedPixel = null;
     show();
   });
   showMap.addEventListener('change', show);
@@ -747,6 +771,14 @@ export function startPage(): void {
   function showDetail(c: MemCell): void {
     const d = $('mx-detail');
     d.replaceChildren(document.createTextNode(cellText(c)));
+    const px = pickedPixel;
+    if (px && (px.address & ~1) === c.address && c.value !== null) {
+      const byte = px.address & 1 ? c.value >> 8 : c.value & 0xff;
+      const colour = px.half === 'high' ? byte >> 4 : byte & 15;
+      d.append(div('mx-pixel', `From the screen: pixel (${octal(px.x, 1)}, ${octal(px.y, 1)}) is byte ${octal(px.address)}`
+        + (px.half ? `, its ${px.half} half (bits ${px.half === 'high' ? '7–4' : '3–0'}): ${octal(byte, 3)} → colour ${octal(colour, 2)}` : `: ${octal(byte, 3)} → colour ${octal(colour, 2)}${byte > 15 ? ' (the high 4 bits are kept, not shown)' : ''}`)
+        + '.'));
+    }
     const src = layout?.source(c.address);
     if (src && (src.rom || current())) {
       const b = Object.assign(document.createElement('button'), { className: 'small secondary', textContent: src.rom ? `rom.mac line ${src.line}` : `Line ${src.line}` });
@@ -755,7 +787,7 @@ export function startPage(): void {
     }
   }
 
-  mxAddr.addEventListener('input', () => { picked = null; show(); });
+  mxAddr.addEventListener('input', () => { picked = null; pickedPixel = null; show(); });
   mxAs.addEventListener('change', show);
   $('mx-prev').addEventListener('click', () => scrollExplorer(-MX_ROWS * 2 * ROW_WORDS));
   $('mx-next').addEventListener('click', () => scrollExplorer(MX_ROWS * 2 * ROW_WORDS));
@@ -784,6 +816,57 @@ export function startPage(): void {
     frameToRgba(f, img.data);
     ctx.putImageData(img, 0, 0);
   }
+
+  // Pixels and addresses: pointing at the screen tells where a pixel is in memory; Shift+click
+  // opens the Memory tab at that byte (a plain click gives the keys to the program).
+  /** The page and mode of the picture shown: latched at the last blank, or once ended, DSPCS now. */
+  function shownScreen(): { mode: number; page: number } {
+    if (!running && sim.ended) {
+      const csr = sim.machine.read(SIM_SYMBOLS.DSPCS, false);
+      return { mode: csr & 4 ? 1 : 0, page: csr & 3 };
+    }
+    const s = sim.display.state();
+    return { mode: s.mode, page: s.page };
+  }
+  let screenShown = { mode: 0, page: 0 };
+  function pixelUnder(e: MouseEvent): PixelSpot | null {
+    const f = shownFrame;
+    if (!f) return null;
+    const r = canvas.getBoundingClientRect();
+    const x = Math.floor(((e.clientX - r.left - canvas.clientLeft) / canvas.clientWidth) * f.width);
+    const y = Math.floor(((e.clientY - r.top - canvas.clientTop) / canvas.clientHeight) * f.height);
+    if (x < 0 || y < 0 || x >= f.width || y >= f.height) return null;
+    return pixelAddress(x, y, f.width === 128 ? 1 : 0, shownScreen().page);
+  }
+  const screenAt = $('screen-at');
+  const SCREEN_AT_HINT = 'Point at a pixel: where it is in memory. Shift+click: open that byte in the Memory tab.';
+  canvas.addEventListener('mousemove', (e) => {
+    const px = pixelUnder(e);
+    const f = shownFrame;
+    if (!px || !f) { screenAt.textContent = SCREEN_AT_HINT; return; }
+    const colour = f.pixels[px.y * f.width + px.x];
+    const word = sim.machine.read(px.address & ~1, false);
+    const byte = px.address & 1 ? word >> 8 : word & 0xff;
+    const now = px.half === 'high' ? byte >> 4 : byte & 15;
+    screenAt.textContent = [
+      `pixel (${octal(px.x, 1)}, ${octal(px.y, 1)})`,
+      `byte ${octal(px.address)}${px.half ? `, ${px.half} half (bits ${px.half === 'high' ? '7–4' : '3–0'})` : ''}`,
+      `colour ${octal(colour, 2)}` + (now !== colour ? ` (memory now ${octal(now, 2)}: not shown yet)` : ''),
+    ].join(' · ');
+  });
+  canvas.addEventListener('mouseleave', () => { screenAt.textContent = SCREEN_AT_HINT; });
+  canvas.addEventListener('mousedown', (e) => { if (e.shiftKey) e.preventDefault(); });
+  canvas.addEventListener('click', (e) => {
+    if (!e.shiftKey) return;
+    const px = pixelUnder(e);
+    if (!px) return;
+    mxAs.value = 'bytes';
+    // a few rows before it, so that it is near the top
+    mxAddr.value = octal(Math.max(0, Math.min(0o200000 - MX_ROWS * 2 * ROW_WORDS, (px.address & ~0o17) - 4 * 2 * ROW_WORDS)));
+    picked = px.address & ~1;
+    pickedPixel = px;
+    setView('memory');
+  });
 
   const wave = $<HTMLCanvasElement>('wave');
   const waveCtx = wave.getContext('2d')!;
