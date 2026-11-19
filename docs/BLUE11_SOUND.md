@@ -182,14 +182,14 @@ The library gives edges; the simulator makes them into sound with the Web Audio 
   At other sample rates a sample is a fraction of cycles, and the same rule applies. A gentle
   high-pass filter removes the constant part, so a speaker left out is silence, not a click
   that never ends. This is a pure function in the simulator's core (`src/sim.ts`), with tests.
-- **At every speed, like a tape.** At real time (the CPU clock's own rate, 1.2 M cycles a second) the sound has its true
-  pitch. At another speed a frame's cycles take that much more or less wall time, so the
-  sound plays slower and lower, or faster and higher: at 1/2 of real time an octave lower and
-  twice as long, at 1/60 a note breaks up into single clicks. Students hear what the speed does
-  to the machine's time. (An earlier version was silent away from real time, so that no note
+- **At every speed, like a tape.** At the machine's native speed (1.2 M cycles per second of wall time) the sound has its
+  true pitch. At another speed a frame's cycles take that much more or less wall time, so the
+  sound plays slower and lower, or faster and higher: at 600 k cycles/s an octave lower and
+  twice as long, at 20 k a note breaks up into single clicks. Students hear what the speed does
+  to the machine's time. (An earlier version was silent away from the machine's native speed, so that no note
   was heard at the wrong pitch.) While paused, while stepping and after the program has
   ended the speaker is silent; a pause or a change of speed cuts off the sound queued.
-- **Scheduling:** each frame's samples (800 at real time) are queued just after the last ones, about 3 frames
+- **Scheduling:** each frame's samples (800 at the machine's native speed) are queued just after the last ones, about 3 frames
   (50 ms) ahead of the audio clock. If the page falls behind (a hidden tab, a slow machine), the
   queue starts again from now rather than playing late.
 - **The browser needs a click first.** Run is a click, so the audio starts there.

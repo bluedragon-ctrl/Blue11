@@ -146,7 +146,7 @@ const running: Section = {
     h('Time and speed'),
     p(`The machine's time is counted in **cycles**: its CPU clock runs ${dec(CPU_HZ)} a second. A cycle is one trip to memory, so a short instruction costs 1–3 [cycles](cycles). `
       + `Two devices count those cycles, each at its own rate: the [display](display) refreshes the screen every ${dec(FRAME)} cycles (a **frame**, ${CPU_HZ / FRAME} a second), and the [line clock](clock) **ticks** every ${dec(TICK)} cycles (${CPU_HZ / TICK} a second). The two are the same today, but they are different things: the screen is for pictures, the tick for timing. `
-      + '**Speed** (in **Settings**, the ⚙ next to Help) says how fast the machine\'s time runs against **real time**, the CPU clock\'s own rate: from 1/60 of real time to 10× real time. A program behaves exactly the same at every speed: only you see (and hear) it faster or slower.'),
+      + '**Speed** (in **Settings**, the ⚙ next to Help) says how many of the machine\'s cycles run per second of your time: from 20 k to 12 M cycles/s. At **1.2 M cycles/s**, the machine\'s native speed, the screen and the line clock run at 60 a second. A program behaves exactly the same at every speed: only you see (and hear) it faster or slower.'),
     h('Typing into your program'),
     p('Click the screen or the console first: the label says *keyboard → program*. Now every key goes to the program: to the [keyboard](keyboard) device, and a key that types a character also to the [console](console). '
       + 'Ctrl and Cmd shortcuts stay with the browser. Clicking elsewhere releases every key.'),
@@ -173,7 +173,6 @@ const debugging: Section = {
     h('Stepping'),
     list(
       '**Step instruction** (F10) runs exactly one instruction, then stops. If the code changed, it loads it first. The status line shows how many [cycles](cycles) it took.',
-      '**Step to next frame** runs every instruction up to the end of this frame (at most 20000 cycles, 1/60 s of the machine\'s time: one picture), then stops; a breakpoint stops it sooner. The status line says how many instructions and cycles that was: often thousands, where Step instruction is one. Handy for a game, which does its work once a frame: one press, one picture.',
       'The current instruction is highlighted in the editor and in the disassembly.',
     ),
     h('Breakpoints'),
@@ -634,7 +633,7 @@ const memory: Section = {
     entries(e('mem-explorer', [], 'The memory explorer (the Memory tab)',
       'The **Memory** tab shows 1000 bytes at a time, 20 to a row, and what each word is: '
         + 'the first word of an **instruction**, an **operand** word (an immediate, an address, an index), **data** from `.WORD`, `.BYTE`, `.ASCII` or `.BLKW`, or the **stack**. '
-        + 'The PC has a frame, SP a green line, a label a dotted underline, and red marks the words the last Step instruction, Step to next frame or Run changed. Click a word to see its bytes, its label and the line that made it.',
+        + 'The PC has a frame, SP a green line, a label a dotted underline, and red marks the words the last Step instruction or Run changed. Click a word to see its bytes, its label and the line that made it.',
       'The buttons jump to each region: the PC, SP, the program, the vectors, the page the screen shows, the ROM and the devices. '
         + 'Typed `PC` or `SP`, the view follows the register as it moves. **words**, **bytes** and **instructions** read the same bits three ways: '
         + 'read as instructions, data turns into nonsense instructions, and read as bytes, an instruction shows its two halves. '
@@ -1031,7 +1030,7 @@ const sound: Section = {
     entries(...symbolEntries('SNDCS', 'SNDDIV')),
     h('In the simulator'),
     list(
-      'Turn **Sound** on in **Settings** (the ⚙ next to Help). At **real time** (the middle of **Speed**) a note plays at its true pitch. At other speeds the sound plays like a tape at the wrong speed: at 1/2 of real time an octave lower and twice as long, at 2× an octave higher; very slow, a note breaks up into clicks, one per switch of the speaker. Paused and stepping, it is silent.',
+      'Turn **Sound** on in **Settings** (the ⚙ next to Help). At **1.2 M cycles/s**, the machine\'s native speed (the middle of **Speed**), a note plays at its true pitch. At other speeds the sound plays like a tape at the wrong speed: at 600 k cycles/s an octave lower and twice as long, at 2.4 M an octave higher; very slow, a note breaks up into clicks, one per switch of the speaker. Paused and stepping, it is silent.',
       'The **Sound** tab draws the speaker over the last frame against a ruler in cycles, and the last half period it measured: you can see a note without hearing it.',
       'A program that prints character 7 (BEL) on the [console](console) rings the bell.',
       'In the Examples menu, under Sound: the **A beeper note**, **A scale**, **A tune** and **Play and draw** examples.',
