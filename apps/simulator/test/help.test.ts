@@ -134,6 +134,18 @@ describe('help examples', () => {
     expect(run('modes', 1).cpu.r.slice(2, 5)).toEqual([5, 6, 6]);
     expect(run('ins-arith').cpu.r[0]).toBe(0o177763);
     expect(run('ins-logic').cpu.r[0]).toBe(0o334);
+    expect(run('ins-eis').cpu.r[0]).toBe(70);
+    // nested calls: R0 = 2 + 1 + 1, the stack empty again
+    const nested = run('stack', 1);
+    expect([nested.cpu.r[0], nested.cpu.r[6]]).toEqual([4, 0o1000]);
+    // the return addresses in its table
+    const lines = nested.program!.listing.split('\n');
+    for (const [at, text] of [['001004', 'JSR  PC, ADD2'], ['001010', 'HALT'], ['001012', 'ADD2:'], ['001016', 'JSR  PC, ADD1'], ['001022', 'RTS  PC']]) {
+      expect(lines.some((l) => l.startsWith(at) && l.includes(text)), `${at} ${text}`).toBe(true);
+    }
+    // counting a loop: the cycles the help works out
+    expect(run('cycles').machine.cycles).toBe(6149);
+    expect(run('devices').machine.output).toBe('A');
     expect(run('ins-branch', 0).cpu.r[0]).toBe(7);
     expect(run('ins-branch', 1).cpu.r[0]).toBe(0o17);
     expect(run('console').machine.output).toBe('HELLO');
@@ -151,6 +163,24 @@ describe('help examples', () => {
     const hi = run('rom');
     const lit = (cx: number) => [...Array(64).keys()].some((i) => px(hi, cx * 8 + (i & 7), i >> 3) === 0o17);
     expect([lit(0), lit(1), lit(2)]).toEqual([true, true, false]);
+  });
+});
+
+describe('help machine code', () => {
+  /** The listing's words of each line of `text`, as the help writes them: `012700 000005`. */
+  const words = (text: string) => assemble(text, { symbols: programSymbols() }).listing.split('\n')
+    .filter((l) => /^\d{6}  \d{6}/.test(l)).map((l) => l.slice(8, 22).trim());
+
+  it('takes instructions apart as the octal page says', () => {
+    expect(words('MOV R1, R0\nMOV R2, R0\nADD R1, R0\nMOV #5, R0')).toEqual(['010100', '010200', '060100', '012700 000005']);
+    expect([0o010100, 0o012700].map((n) => n.toString(16).toUpperCase())).toEqual(['1040', '15C0']);
+  });
+
+  it('shows the listing the assembler page shows', () => {
+    const table = SECTIONS.find((s) => s.id === 'assembler')!.blocks.find((b) => b.kind === 'table')!;
+    if (table.kind !== 'table') throw new Error('no table');
+    const src = table.rows.map((r) => r[2].replace(/`/g, '')).join('\n');
+    expect(words(src)).toEqual(table.rows.map((r) => r[1].replace(/`/g, '')));
   });
 });
 
