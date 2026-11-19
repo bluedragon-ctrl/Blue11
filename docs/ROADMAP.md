@@ -96,8 +96,11 @@ README as a departure from the original machine.
        red for what the last command changed, whiter the more often a word ran; squares for the
        PC and SP and a frame for the rows shown. Pointing tells what is there; a click shows it
        in the rows. About 1.5 ms per animation frame while running.
-    3. **Pixels and addresses:** hovering a pixel on the screen shows its address (`12YYXX`), and
-       a click opens the tab at that byte (and nibble in mode 1).
+    3. ~~**Pixels and addresses**~~ (done, 2026-11-19): pointing at a pixel on the screen shows
+       its coordinates, its byte (`12YYXX`; in mode 1 which half) and its colour, and the
+       colour in memory if it is not shown yet. **Shift**+click opens the tab at that byte in
+       bytes, the byte (and half) explained: a plain click still gives the keys to the
+       program. In the tab, a word of pixel memory says which pixels it holds, on which page.
     4. **Accesses and watchpoints:** read / write heat per word and "stop when this word is
        written", through `onAccess`, on only while used, once its cost is measured.
 13. **Conditional assembly and repetition:** `.IF` / `.IFF` / `.IFT` / `.ENDC` with `EQ NE GT

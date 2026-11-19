@@ -639,7 +639,8 @@ const memory: Section = {
       'Above the rows, the **map** shows all 64 KB at once, a dot per word and 1000 bytes to a row, in the same colours: '
         + 'your program is a few dots near the top, the pixel memory is the band at 120000, the ROM and the devices are at the bottom. '
         + 'A 0 is dim, black means nothing answers there, red is what the last command changed, and the more often a word ran as an instruction, the whiter it is. '
-        + 'The PC has a white square, SP a green one, and a frame shows the 1000 bytes in the rows. Point at a dot to see what is there; click it to show it in the rows. The **map** box hides it.')),
+        + 'The PC has a white square, SP a green one, and a frame shows the 1000 bytes in the rows. Point at a dot to see what is there; click it to show it in the rows. The **map** box hides it. '
+        + 'A word of pixel memory says which pixels it holds, and Shift+click on the screen opens the byte of a pixel.')),
   ],
 };
 
@@ -836,6 +837,8 @@ const display: Section = {
       ['**0**', '64 × 64 (`100` × `100`)', 'a byte', '120000, 130000, 140000, 150000', '`page + y*100 + x`'],
       ['**1**', '128 × 128 (`200` × `200`)', '4 bits, two per byte', '120000, 140000', '`page + y*100 + x/2`'],
     ]),
+    p('**Try it:** point at a pixel on the screen and the line under it tells its coordinates, its byte (in mode 1, which half) and its colour. '
+      + '**Shift+click** opens the Memory tab at that byte; a word of pixel memory there says which pixels it holds.'),
     p('Mode 0 is the default and the easiest. A **page** is one screenful of memory; the display shows one page while you may draw on another (see [frames and pages](display-frames)).'),
     h('Mode 0: a byte per pixel'),
     p('In octal the address shows the position: page 0 is `12YYXX`, so pixel (x = 12, y = 34) is at 123412. One row down adds 100, one pixel right adds 1.'),

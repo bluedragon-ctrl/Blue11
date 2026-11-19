@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { octal } from 'blue11';
 import {
   addressNamer, charOf, disassemblyAround, explorerInstructions, explorerRows, lineHeat, MAP_COLOURS, MAP_COLS, MAP_ROWS, mapAddress,
-  mapCell, memoryLayout, memoryMapRgba, memoryRows, memorySnapshot, parseAddress, peek,
+  mapCell, memoryLayout, memoryMapRgba, memoryRows, memorySnapshot, parseAddress, peek, pixelAddress, pixelsOfWord,
   regionOf, registerText, stackRows, vectorName,
 } from '../src/debug';
 import { romAssembly } from '../src/rom';
@@ -162,5 +162,34 @@ STK:                      ; 1076`);
     expect(at(0o1014)).toEqual(MAP_COLOURS.code.map((c) => Math.round(c * 0.55))); // HALT is 000000
     expect(at(0o1002)).toEqual([...MAP_COLOURS.operand]);
     expect(px[3]).toBe(255);
+  });
+});
+
+describe('pixels and addresses', () => {
+  it('reads the address of a pixel straight off its octal coordinates', () => {
+    expect(pixelAddress(0o12, 0o34, 0, 0)).toEqual({ x: 0o12, y: 0o34, address: 0o123412, half: null });
+    expect(pixelAddress(0o77, 0o77, 0, 3).address).toBe(0o157777);
+    expect(pixelAddress(0o12, 0o34, 0, 1).address).toBe(0o133412);
+    // mode 1: two pixels a byte, the even one in the low half; pages 20000 apart, bit 1 ignored
+    expect(pixelAddress(0o25, 0o177, 1, 0)).toEqual({ x: 0o25, y: 0o177, address: 0o137712, half: 'high' });
+    expect(pixelAddress(0o24, 0, 1, 1)).toEqual({ x: 0o24, y: 0, address: 0o140012, half: 'low' });
+    expect(pixelAddress(0o24, 0, 1, 3).address).toBe(0o140012);
+  });
+
+  it('finds the pixels a word holds on the page shown', () => {
+    expect(pixelsOfWord(0o123412, 0, 0)).toEqual({ x: 0o12, y: 0o34, n: 2 });
+    expect(pixelsOfWord(0o123413, 0, 0)).toEqual({ x: 0o12, y: 0o34, n: 2 });
+    expect(pixelsOfWord(0o133412, 0, 0)).toBeNull();
+    expect(pixelsOfWord(0o133412, 0, 1)).toEqual({ x: 0o12, y: 0o34, n: 2 });
+    expect(pixelsOfWord(0o137712, 1, 0)).toEqual({ x: 0o24, y: 0o177, n: 4 });
+    expect(pixelsOfWord(0o140000, 1, 0)).toBeNull();
+    expect(pixelsOfWord(0o1000, 0, 0)).toBeNull();
+    // the round trip
+    for (const [x, y, m, p] of [[5, 6, 0, 2], [0o177, 0o100, 1, 1]]) {
+      const w = pixelsOfWord(pixelAddress(x, y, m, p).address, m, p)!;
+      expect(x - w.x).toBeGreaterThanOrEqual(0);
+      expect(x - w.x).toBeLessThan(w.n);
+      expect(w.y).toBe(y);
+    }
   });
 });
