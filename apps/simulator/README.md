@@ -44,7 +44,9 @@ deployed to GitHub Pages from `main`: **[bluedragon-ctrl.github.io/Blue11](https
   last command changed, under a map of all 64 KB (a dot per word, coloured the same way, with
   the heat: point at it to see a word, click it to show it in the rows). Pointing at the
   screen tells a pixel's address (`12YYXX`, and the half of the byte in mode 1); Shift+click
-  opens the Memory tab at it.
+  opens the Memory tab at it. **reads/writes** counts each word's reads and writes (the map
+  shows them), and **Stop when written** on a word stops the run after the instruction that
+  writes it. The CPU's access hook is installed only while either is used.
 - **Keys.** While the screen or the console has focus ("keyboard → program"), every key goes
   to the keyboard device, and a key that types a character also goes to the console
   ([keyboard spec §7.1](../../docs/BLUE11_KEYBOARD.md)). Ctrl and Cmd shortcuts stay with the

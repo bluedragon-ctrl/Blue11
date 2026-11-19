@@ -112,6 +112,14 @@ main > .code { display: flex; flex-direction: column; height: calc(100vh - 5.5re
 .w.picked, .mrow.picked { outline: 2px solid #fff; }
 .mx-detail { font-family: system-ui, sans-serif; font-size: 0.82rem; min-height: 2.6em; border-left: 3px solid var(--accent); background: #39d0ff12; padding: 0.3rem 0.6rem; }
 .mx-detail .empty { opacity: 0.6; }
+.w.watched { box-shadow: inset 0 0 0 2px #ff8a1e; }
+.mx-watches { font-size: 0.8rem; display: flex; flex-wrap: wrap; align-items: center; gap: 0.3rem; }
+.mx-watches[hidden] { display: none; }
+.mx-watches button { font-family: ui-monospace, monospace; }
+.mx-legend .acc { padding: 0 0.3rem; color: #000; }
+.mx-legend .acc.read { background: #39a0ff; }
+.mx-legend .acc.write { background: #ff8a1e; }
+.mx-legend .acc.both { background: #ffff00; }
 .mx-legend { display: flex; flex-wrap: wrap; gap: 0.5rem; font-size: 0.75rem; }
 .mx-legend .w { cursor: default; padding: 0 0.3rem; }
 .mx-legend .w.sp { margin-left: 3px; }

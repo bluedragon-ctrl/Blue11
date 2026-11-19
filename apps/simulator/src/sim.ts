@@ -25,13 +25,42 @@ export interface SimOptions {
   eis?: boolean;
 }
 
-/** Why a command stopped: the CPU's reasons, 'frame' (the frame ended), 'asleep' (WAIT and nothing can wake it). */
-export type Stop = Exclude<StopReason, 'budget' | 'wait'> | 'frame' | 'asleep';
+/**
+ * Why a command stopped: the CPU's reasons, 'frame' (the frame ended), 'asleep' (WAIT and
+ * nothing can wake it), 'watch' (an instruction wrote a watched word).
+ */
+export type Stop = Exclude<StopReason, 'budget' | 'wait'> | 'frame' | 'asleep' | 'watch';
 
 export interface StepResult {
   stop: Stop | 'step';
   cycles: number;
   trap?: TrapInfo;
+  /** For 'watch': the write. */
+  watch?: WatchHit;
+}
+
+/** A write to a watched word: by the instruction at `pc`, a byte or the word, the word before and after. */
+export interface WatchHit {
+  /** The word's address (even). */
+  address: number;
+  /** The byte or word address written. */
+  at: number;
+  byte: boolean;
+  /** The instruction that wrote it; for an interrupt's push, the instruction it interrupted. */
+  pc: number;
+  /**
+   * An interrupt wrote it, pushing the PC and PSW (the stack is the word): the run stopped
+   * after the handler's first instruction.
+   */
+  interrupt: boolean;
+  was: number;
+  now: number;
+}
+
+/** Reads and writes of each word by the program, instruction fetches left out (counted in `heat`). */
+export interface AccessCounts {
+  reads: Uint32Array;
+  writes: Uint32Array;
 }
 
 /** A run saved to a file: the program, its options and its input log (keyboard spec §7.1). */
@@ -101,7 +130,23 @@ export class Simulator {
   /** BEL characters (7) the program printed and the page has not rung yet. */
   bells = 0;
 
-  /** Characters typed on the console in this run (the keyboard keeps its own log). */
+  /** Reads and writes per word since they were turned on (`countAccesses`) or the restart; null while off. */
+  access: AccessCounts | null = null;
+  /** The last command stopped on a watched word: the write. */
+  watchHit: WatchHit | null = null;
+  /** Words (even addresses) to stop after an instruction writes them, with their value as the watch last saw it. */
+  private watched = new Map<number, number>();
+  /** 1 for a watched word, by word number: the hook's quick test on every write. */
+  private watchedWords = new Uint8Array(0x8000);
+  /** The watched word written in the instruction now running, if one was. */
+  private hit: WatchHit | null = null;
+  /** The address of the instruction now running, and how many have run (for the watch). */
+  private ipc = 0;
+  private count = 0;
+  /** `count` when the watched word was written. */
+  private hitCount = 0;
+
+  /** Characters typed on the console (the keyboard keeps its own log). */
   private typed: Array<{ cycle: number; ch: number }> = [];
   /** Console characters still to type at their cycle (a replay). */
   private pending: Array<{ cycle: number; ch: number }> = [];
@@ -119,11 +164,72 @@ export class Simulator {
     // A trap through an empty vector stops instead of jumping to 0 and running the vectors.
     m.cpu.onTrap = (t) => (m.read(t.vector, false) === 0 ? 'stop' : 'vector');
     m.cpu.onInstruction = (pc) => {
+      this.ipc = pc;
+      this.count++;
       this.heat[pc >> 1]++;
       const sp = m.cpu.r[6];
       if (sp > this.stackTop && sp <= RAM_END) this.stackTop = sp;
     };
     this.machine = m;
+    this.hook();
+  }
+
+  /**
+   * Count reads and writes of every word (on) or stop counting (off; the counts are dropped).
+   * The CPU's access hook costs time, so it is on only while counts or watches are used.
+   */
+  countAccesses(on: boolean): void {
+    if (on === !!this.access) return;
+    this.access = on ? { reads: new Uint32Array(0x8000), writes: new Uint32Array(0x8000) } : null;
+    this.hook();
+  }
+
+  /** The words watched (even addresses). */
+  get watches(): number[] { return [...this.watched.keys()].sort((a, b) => a - b); }
+
+  /** Stop after an instruction writes the word at `address` (on), or no longer (off). */
+  watch(address: number, on: boolean): void {
+    const a = address & 0xfffe;
+    if (on) this.watched.set(a, 0); else this.watched.delete(a);
+    this.watchedWords[a >> 1] = on ? 1 : 0;
+    this.hook();
+  }
+
+  /** The watched words as they are now (the host may have changed them, or a restart). */
+  private seeWatched(): void {
+    for (const a of this.watched.keys()) {
+      // not read in the I/O page: a register's read can take a character from the program
+      const v = a >= 0o170000 && a !== 0o177776 ? -1 : this.machine.read(a, false);
+      this.watched.set(a, v < 0 ? -1 : v);
+    }
+  }
+
+  /** The CPU's access hook: installed only while counting or watching. */
+  private hook(): void {
+    const cpu = this.machine.cpu;
+    const counts = this.access;
+    const watched = this.watched;
+    const quick = this.watchedWords;
+    if (!counts && !watched.size) { cpu.onAccess = null; return; }
+    cpu.onAccess = (addr, value, write, byte) => {
+      const w = addr >> 1;
+      if (write) {
+        if (counts) counts.writes[w]++;
+        if (quick[w]) {
+          const was = watched.get(addr & 0xfffe)!;
+          // what was written (a device register may read back otherwise); a byte keeps the other half
+          const old = was < 0 ? 0 : was;
+          const now = !byte ? value : addr & 1 ? (old & 0xff) | (value << 8) : (old & 0xff00) | value;
+          watched.set(addr & 0xfffe, now);
+          if (!this.hit) {
+            this.hit = { address: addr & 0xfffe, at: addr, byte, pc: this.ipc, interrupt: false, was, now };
+            this.hitCount = this.count;
+            // stop once this instruction is done: the CPU checks `halted` before the next one
+            cpu.halted = true;
+          }
+        }
+      } else if (counts && addr !== cpu.r[7]) counts.reads[w]++; // a fetch reads at the PC
+    };
   }
 
   get display() { return this.machine.display!; }
@@ -200,6 +306,8 @@ export class Simulator {
     if (!this.program) return;
     this.machine.boot(this.program);
     this.heat.fill(0);
+    if (this.access) { this.access.reads.fill(0); this.access.writes.fill(0); }
+    this.watchHit = null;
     this.stackTop = Math.min(this.cpu.r[6], RAM_END);
     this.typed = [];
     this.pending = [];
@@ -273,7 +381,7 @@ export class Simulator {
    */
   runFrame(resume = false): StepResult {
     this.unhalt();
-    this.trap = null;
+    this.begin();
     const pc = this.cpu.r[7];
     if (!resume && this.breakpoints.has(pc) && !this.cpu.halted && !this.cpu.waiting) return this.finish('breakpoint', 0);
     let left = this.toFrameEnd();
@@ -296,7 +404,7 @@ export class Simulator {
   /** One instruction. Asleep in WAIT, time passes until an interrupt wakes the CPU (at most a frame). */
   step(): StepResult {
     this.unhalt();
-    this.trap = null;
+    this.begin();
     const cpu = this.cpu;
     if (cpu.halted) return this.finish('halt', 0);
     let used = 0;
@@ -317,9 +425,30 @@ export class Simulator {
     }
   }
 
-  private finish(stop: Stop | 'step', cycles: number): StepResult {
+  /** A command starts: no trap, no watch hit yet, the watched words as they are. */
+  private begin(): void {
+    this.trap = null;
+    this.hit = null;
+    this.watchHit = null;
+    if (this.watched.size) this.seeWatched();
+  }
+
+  /**
+   * The stop, with the watch: the hook set `halted` to stop after the instruction that wrote a
+   * watched word, so the stop is a 'watch' and the CPU goes on. A trap or a double fault in the
+   * same instruction is said first (a double fault stays halted).
+   */
+  private finish(reason: Stop | 'step', cycles: number): StepResult {
+    let stop = reason;
+    if (this.hit) {
+      // an instruction ran after the write: the write came before it, from an interrupt
+      this.watchHit = { ...this.hit, interrupt: this.count > this.hitCount };
+      this.hit = null;
+      if (stop !== 'double-fault') this.cpu.halted = false;
+      if (stop !== 'trap' && stop !== 'double-fault') stop = 'watch';
+    }
     this.last = stop;
-    return { stop, cycles, trap: this.trap ?? undefined };
+    return { stop, cycles, trap: this.trap ?? undefined, watch: this.watchHit ?? undefined };
   }
 
   /** The address of the first instruction on source line `line`, or null. */

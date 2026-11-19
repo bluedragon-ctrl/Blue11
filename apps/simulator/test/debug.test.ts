@@ -2,7 +2,7 @@ import { assemble } from 'blue11';
 import { describe, expect, it } from 'vitest';
 import { octal } from 'blue11';
 import {
-  addressNamer, charOf, disassemblyAround, explorerInstructions, explorerRows, lineHeat, MAP_COLOURS, MAP_COLS, MAP_ROWS, mapAddress,
+  accessMapRgba, accessText, ACCESS_COLOURS, addressNamer, charOf, disassemblyAround, explorerInstructions, explorerRows, lineHeat, MAP_COLOURS, MAP_COLS, MAP_ROWS, mapAddress,
   mapCell, memoryLayout, memoryMapRgba, memoryRows, memorySnapshot, parseAddress, peek, pixelAddress, pixelsOfWord,
   regionOf, registerText, stackRows, vectorName,
 } from '../src/debug';
@@ -191,5 +191,33 @@ describe('pixels and addresses', () => {
       expect(x - w.x).toBeLessThan(w.n);
       expect(w.y).toBe(y);
     }
+  });
+});
+
+describe('accesses', () => {
+  it('colours the map by reads and writes', () => {
+    const words = new Int32Array(0x8000);
+    words[5] = -1; // nothing answers
+    const reads = new Uint32Array(0x8000);
+    const writes = new Uint32Array(0x8000);
+    reads[1] = 10;
+    writes[2] = 4;
+    reads[3] = 1;
+    writes[3] = 4;
+    const out = new Uint8ClampedArray(0x8000 * 4);
+    accessMapRgba(words, reads, writes, out);
+    const at = (w: number) => [...out.slice(w * 4, w * 4 + 3)];
+    expect(at(0)).toEqual([...ACCESS_COLOURS.idle]);
+    expect(at(5)).toEqual([0x0b, 0x0e, 0x12]);
+    expect(at(1)).toEqual([...ACCESS_COLOURS.read]); // the most read: full
+    expect(at(2)).toEqual([...ACCESS_COLOURS.write]);
+    expect(at(3)[0]).toBe(255); // both: the sum, clamped
+    expect(out[3 * 4 + 3]).toBe(255);
+  });
+
+  it('says them in words, in octal', () => {
+    expect(accessText(0, 0)).toBe('not read or written');
+    expect(accessText(1, 0)).toBe('read once, not written');
+    expect(accessText(0o10, 1)).toBe('read 10 times, written once');
   });
 });

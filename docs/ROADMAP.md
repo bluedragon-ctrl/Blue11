@@ -101,8 +101,13 @@ README as a departure from the original machine.
        colour in memory if it is not shown yet. **Shift**+click opens the tab at that byte in
        bytes, the byte (and half) explained: a plain click still gives the keys to the
        program. In the tab, a word of pixel memory says which pixels it holds, on which page.
-    4. **Accesses and watchpoints:** read / write heat per word and "stop when this word is
-       written", through `onAccess`, on only while used, once its cost is measured.
+    4. ~~**Accesses and watchpoints**~~ (done, 2026-11-19): **reads/writes** counts each word's
+       reads and writes (fetches left out; the map shows them, blue and orange) and **Stop when
+       written** on a word stops the run after the instruction that writes it, saying what it
+       wrote. Through `onAccess`, installed only while either is used: measured on a loop that
+       only touches memory, 0.38 ms a frame without it and 0.43–0.52 ms with it (none when off).
+       The hook stops the run by setting `halted`, so the library needed nothing new; a write
+       by an interrupt's push stops after the handler's first instruction, and says so.
 13. **Conditional assembly and repetition:** `.IF` / `.IFF` / `.IFT` / `.ENDC` with `EQ NE GT
     LT GE LE DF NDF`, `.IIF`, and `.REPT` / `.ENDR`. Small, self-contained, and they let the
     ROM and the examples drop copy-pasted tables.
