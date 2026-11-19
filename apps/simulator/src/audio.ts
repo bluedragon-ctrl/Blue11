@@ -7,13 +7,14 @@
  */
 
 import type { Edge, SoundChunk } from 'blue11';
+import { REAL_TIME } from './speed';
 
 /** The machine's speed: 60 frames of 20000 cycles a second. */
 export const CYCLES_PER_SECOND = 1_200_000;
 
 /** Sound plays only at real time, while the program runs. */
 export function shouldPlay(running: boolean, fps: number): boolean {
-  return running && fps === 60;
+  return running && fps === REAL_TIME;
 }
 
 /** The share of `[a, b)` the speaker was out, given its level at `from` and the edges after it. */

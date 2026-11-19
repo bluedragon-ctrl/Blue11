@@ -185,7 +185,7 @@ The library gives edges; the simulator makes them into sound with the Web Audio 
 - **Only at real time.** Sound plays only while the program runs at 60 frames a second. At any
   other speed, while paused, while stepping, and after the program has ended, the speaker is
   silent: a tune played at the wrong speed would teach the wrong pitch. The page says
-  "sound: real time only" next to the speed when it mutes for this reason.
+  "(silent)" next to the speed, and why in its tooltip, when it mutes for this reason.
 - **Scheduling:** each frame's 800 samples are queued just after the last ones, about 3 frames
   (50 ms) ahead of the audio clock. If the page falls behind (a hidden tab, a slow machine), the
   queue starts again from now rather than playing late.

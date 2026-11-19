@@ -29,12 +29,12 @@
           <button id="restart" class="secondary" title="Load the program again, stopped at its first instruction">Restart</button>
         </div>
         <div class="toolbar settings">
-          <label class="speed" title="How many of the machine's frames (20000 cycles each) run per second of your time. 60 is real time.">Speed
+          <label class="speed" title="How fast the machine runs against real time. The machine counts time in frames of 20000 cycles, one tick of its 60 Hz line clock each: at real time 60 run per second of your time. A program behaves exactly the same at every speed.">Speed
             <input id="speed" type="range" min="0" max="9" value="6"> <span id="speed-text"></span>
           </label>
           <label title="The real beam draws the picture row by row while the program runs, so changing the page or palette mid-frame tears. Changing it restarts the program."><input id="beam" type="checkbox"> Real beam (tearing)</label>
           <label title="The Extended Instruction Set: MUL, DIV, ASH, ASHC. Changing it restarts the program."><input id="eis" type="checkbox"> EIS</label>
-          <label title="The speaker (SNDCS, SNDDIV). It plays only at 60 frames/s, real time: at any other speed the pitch would be wrong."><input id="sound" type="checkbox"> Sound</label>
+          <label title="The speaker (SNDCS, SNDDIV). It plays only when Speed is at real time (the middle of the slider): at any other speed the pitch would be wrong."><input id="sound" type="checkbox"> Sound</label>
           <label class="volume" title="The speaker's volume">Volume <input id="volume" type="range" min="0" max="100" step="5"></label>
           <label title="The look of the period: the screen as a CRT, the listings printed on fan-fold paper, the console as an amber terminal. The editor and the debugger stay as they are."><input id="retro" type="checkbox"> Retro</label>
         </div>

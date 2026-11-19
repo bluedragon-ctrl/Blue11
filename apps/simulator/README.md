@@ -10,8 +10,8 @@ deployed to GitHub Pages from `main`: **[bluedragon-ctrl.github.io/Blue11](https
   their lines. Breakpoints: click left of a line number, or F9. A heat bar beside the line
   numbers shows how often each line ran. Ctrl+Enter runs, F10 steps.
 - **Run, Continue, Pause, Step, Step frame, Restart.** The machine runs whole frames of 20000
-  cycles. **Speed** is in frames per second of wall time (1–600; 60 is real time), never in
-  cycles per frame, so a program behaves the same at every speed. **Real beam (tearing)** and
+  cycles. **Speed** is shown against real time (1/60 of real time to 10×; real time is 60 frames,
+  ticks of the line clock, per second of wall time), never in cycles per frame, so a program behaves the same at every speed. **Real beam (tearing)** and
   **EIS** are settings of the machine: changing one starts the program again. Step on a `WAIT`
   sleeps to the next interrupt and stops in its handler (at most a frame).
 - **Screen** (the display, mode 0 or 1), **Listing** (the assembler's listing, the PC's row
@@ -24,7 +24,7 @@ deployed to GitHub Pages from `main`: **[bluedragon-ctrl.github.io/Blue11](https
 - **Console** (the DL11 terminal), below the tabs, so it stays in view with each of them.
 - **Sound** (on unless turned off, with its volume, kept in the browser): the speaker
   (`SNDCS`, `SNDDIV`, [sound spec](../../docs/BLUE11_SOUND.md)) played with Web Audio. It plays
-  only at 60 frames/s, real time, and is silent at other speeds, while paused and while
+  only at real time (60 frames/s), and is silent at other speeds, while paused and while
   stepping, so a note is never heard at the wrong pitch. The **Sound** tab draws the speaker over
   the last frame against a ruler in cycles, with the last half period it measured. A program
   that prints BEL (7) on the console rings a bell. The edges become samples in `src/audio.ts`

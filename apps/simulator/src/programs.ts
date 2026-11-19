@@ -159,7 +159,7 @@ export const PROGRAMS: Program[] = [
   ...EXAMPLES.map((e) => ({ id: `console-${slug(e.name)}`, group: 'Console' as const, name: e.name, source: e.source, input: e.input, expect: e.expect })),
   ...DISPLAY_EXAMPLES.map((e) => ({ id: `display-${slug(e.name)}`, group: 'Display' as const, name: e.name, source: e.source, beam: e.beam })),
   ...KEYBOARD_EXAMPLES.map((e) => ({ id: `keyboard-${slug(e.name)}`, group: 'Keyboard' as const, name: e.name, source: e.source, keys: e.keys })),
-  ...SOUND_EXAMPLES.map((e) => ({ id: `sound-${slug(e.name)}`, group: 'Sound' as const, name: e.name, source: e.source, keys: 'Turn the sound on, at 60 frames/s. The Sound tab shows the speaker.' })),
+  ...SOUND_EXAMPLES.map((e) => ({ id: `sound-${slug(e.name)}`, group: 'Sound' as const, name: e.name, source: e.source, keys: 'Turn the sound on, with Speed at real time. The Sound tab shows the speaker.' })),
   ...ROM_EXAMPLES.map((e) => ({ ...e, id: `text-${slug(e.name)}`, group: 'Text (the ROM)' as const })),
 ];
 

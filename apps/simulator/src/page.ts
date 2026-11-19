@@ -20,6 +20,7 @@ import {
 } from './debug';
 import { breakpointLines, debugExtensions, setErrors, setHeat, setPcLine, toggleBreakpointAtCursor } from './editor';
 import { CYCLES_PER_SECOND, lastHalfPeriod, shouldPlay } from './audio';
+import { REAL_TIME, SPEEDS, speedText as speedLine, speedWhy } from './speed';
 import { HELP, inComment, wordAt } from './help';
 import { helpTooltip } from './help/tooltip';
 import { numberTooltip } from './number-tip';
@@ -32,8 +33,6 @@ import { Speaker } from './speaker';
 import { Library, shareHash, sharedProgram } from './storage';
 import { describeTrap } from './traps';
 
-/** The speed slider's stops, in frames per second of wall time (60 is real time). */
-export const SPEEDS = [1, 2, 5, 10, 20, 30, 60, 120, 240, 600];
 /** At most this long (ms) of simulation per animation frame, so the page still answers. */
 const BUDGET_MS = 40;
 
@@ -243,9 +242,10 @@ export function startPage(): void {
   // ---------------------------------------------------------------- settings
 
   const speedText = $('speed-text');
-  const fps = () => SPEEDS[Number(speed.value)] ?? 60;
+  const fps = () => SPEEDS[Number(speed.value)] ?? REAL_TIME;
   function showSpeed(): void {
-    speedText.textContent = `${fps()} frames/s${fps() === 60 ? ' (real time)' : soundOn.checked ? ' (sound: real time only)' : ''}`;
+    speedText.textContent = speedLine(fps(), soundOn.checked);
+    speedText.title = speedWhy(fps(), soundOn.checked);
     try { browserStorage()?.setItem('blue11.sim.speed', speed.value); } catch { /* off */ }
   }
   speed.addEventListener('input', showSpeed);
