@@ -108,25 +108,43 @@ README as a departure from the original machine.
        only touches memory, 0.38 ms a frame without it and 0.43–0.52 ms with it (none when off).
        The hook stops the run by setting `halted`, so the library needed nothing new; a write
        by an interrupt's push stops after the handler's first instruction, and says so.
-13. **Conditional assembly and repetition:** `.IF` / `.IFF` / `.IFT` / `.ENDC` with `EQ NE GT
+13. **Tools for numbers and characters in the simulator** (only the simulator). Students
+    convert between octal, decimal and binary, and look up character codes, all the time. Not a
+    general calculator: everything uses the assembler's own rules (16-bit wrap, signed `/`,
+    `10.`, `'A`), so a tool never disagrees with the code. Octal first, hex last. One PR each:
+    1. ~~**Numbers explain themselves**~~ (done, 2026-11-19): resting the mouse on a number or
+       a program's name in the editor shows octal, decimal and signed, hex, binary grouped by
+       octal digit (`1 111 111 111 111 111`), and the bytes or the character; a number the
+       assembler refuses says why. The registers, the PSW (bit by bit), the stack and the
+       Memory tab say the same. Tested against the assembler.
+    2. **A Chars tab**, beside Screen, Listing, ROM and Sound (not in the help, which is a
+       dialog): the font's real glyphs in a 16 × 8 grid with octal codes. A click shows the
+       codes in octal, decimal and hex, the glyph's 8 bytes in binary beside its picture at
+       `FONT+c*10`, **Show in memory** (the Memory tab at those bytes) and **Insert** (`'A` or
+       `101` into the editor). Codes 0–37 by name (BEL, BS, LF, CR), and a note that key codes
+       (`K.UP`…) are not ASCII.
+    3. **An expression box** in the same tab: `<DSPCS+2>`, `-1`, `100./3`, `'A+1`, with the
+       program's labels, shown in every base. Evaluated by the assembler itself (the program
+       plus `.WORD <expr>`), so the public API needs nothing new.
+14. **Conditional assembly and repetition:** `.IF` / `.IFF` / `.IFT` / `.ENDC` with `EQ NE GT
     LT GE LE DF NDF`, `.IIF`, and `.REPT` / `.ENDR`. Small, self-contained, and they let the
     ROM and the examples drop copy-pasted tables.
-14. **Macros:** `.MACRO` / `.ENDM` with arguments, default values and `.NARG`, then `.IRP` /
+15. **Macros:** `.MACRO` / `.ENDM` with arguments, default values and `.NARG`, then `.IRP` /
     `.IRPC`. The largest gap from the original assembler; listings show expansions as the
     original does. Needs a design note in `BLUE11_MACHINE.md` §3 first (what of `.MCALL` the
     predefined symbols replace).
-15. **More of the /40 and its successors' instructions**, each as an option like `eis`: `SPL`
+16. **More of the /40 and its successors' instructions**, each as an option like `eis`: `SPL`
     and `MTPS` / `MFPS` (a priority change that works under `protectModes`), and `MARK`.
-16. **`.INCLUDE`** through a host callback (`options.include(name) → source`), so the
+17. **`.INCLUDE`** through a host callback (`options.include(name) → source`), so the
     simulator's ROM routines and a host's library can be shared without pasting. The library
     stays free of file I/O.
-17. **A differential test against SIMH:** random instruction sequences, compared register by
+18. **A differential test against SIMH:** random instruction sequences, compared register by
     register and flag by flag with traces from SIMH's /40 model (with EIS), checked in as
     fixtures. It pins down the corners: `ASH` / `ASHC` overflow, `DIV` overflow, `SBC` / `ADC`
     flags, the order of side effects in `JSR R, @(R)+` and `MOV R, (R)+`.
-18. **Documented restart rules for hosts:** when `onTrap` stops on a fault, the PC is set back
+19. **Documented restart rules for hosts:** when `onTrap` stops on a fault, the PC is set back
     but autoincrement and autodecrement have already happened. Say so in the README, and
     consider an option to undo them (the /45's `SSR1` records exactly this).
-19. **Later, if wanted:** a third display mode (such as 128 × 128 at 1 bpp), a mouse, more keys,
+20. **Later, if wanted:** a third display mode (such as 128 × 128 at 1 bpp), a mouse, more keys,
    and a shared UI package for the debugger panels HackCode and the simulator have in common
    (extracted only once both exist).

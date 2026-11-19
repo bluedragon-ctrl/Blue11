@@ -96,6 +96,7 @@ const octalSection: Section = {
       ['255. (a full byte)', '`377`', '11 111 111'],
       ['65535. (a full word)', '`177777`', '1 111 111 111 111 111'],
     ]),
+    note('**Point at a number to convert it.** In the editor, rest the mouse on a number (`177777`, `10.`, `^B101`, `\'A`, `-1`) or on one of your labels: a tooltip gives it in octal, decimal, hex and binary (grouped by octal digit), with its bytes or its character. The registers, the PSW (bit by bit), the stack and the Memory tab say the same when you point at them.'),
     h('Why octal?'),
     p('**One octal digit is exactly three bits.** So you can read the bits of a number straight from its digits: `5` is 101, so `55` is 101 101. '
       + 'Computers work in bits, and the PDP-11\'s instructions are built from 3-bit fields, so octal makes the machine easy to read.'),

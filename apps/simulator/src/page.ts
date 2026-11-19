@@ -16,12 +16,13 @@ import { frameToRgba, keyCode, octal, type AsmError, type Frame } from 'blue11';
 import { blue11Asm, blue11Highlight } from 'blue11/codemirror';
 import {
   addressNamer, charOf, disassemblyAround, explorerInstructions, explorerRows, inRom, lineHeat, MAP_COLS, MAP_ROWS, mapAddress,
-  accessMapRgba, accessText, mapCell, memoryLayout, memoryMapRgba, memoryRows, memorySnapshot, parseAddress, pixelAddress, pixelsOfWord, READ_TAKES, regionOf, registerText, ROW_WORDS, stackRows, vectorName, type MemCell, type PixelSpot, type Role,
+  accessMapRgba, accessText, mapCell, memoryLayout, memoryMapRgba, memoryRows, memorySnapshot, parseAddress, pixelAddress, pixelsOfWord, numberParts, READ_TAKES, regionOf, registerText, registerTitles, ROW_WORDS, stackRows, vectorName, type MemCell, type PixelSpot, type Role,
 } from './debug';
 import { breakpointLines, debugExtensions, setErrors, setHeat, setPcLine, toggleBreakpointAtCursor } from './editor';
 import { CYCLES_PER_SECOND, lastHalfPeriod, shouldPlay } from './audio';
 import { HELP, inComment, wordAt } from './help';
 import { helpTooltip } from './help/tooltip';
+import { numberTooltip } from './number-tip';
 import { HelpView } from './help/view';
 import { FIRST, PROGRAMS, type Program } from './programs';
 import { romAssembly } from './rom';
@@ -124,6 +125,7 @@ export function startPage(): void {
       doc: '',
       extensions: [
         debugExtensions, lineNumbers(), history(), helpTooltip(HELP, (t) => help.open(t)),
+        numberTooltip(() => (current() ? sim.program?.symbols ?? null : null), (w) => HELP.entryFor(w) !== null),
         keymap.of([
           { key: 'F1', run: helpAtCursor },
           { key: 'Mod-Enter', run: () => { run(); return true; } },
@@ -608,7 +610,7 @@ export function startPage(): void {
   function cellText(c: MemCell): string {
     const r = regionOf(c.address);
     const parts = [`${octal(c.address)}: ${c.value !== null ? octal(c.value) : READ_TAKES.has(c.address) ? 'not read here: reading it would take the character from the program' : 'nothing answers here (a bus error)'}`];
-    if (c.value !== null) parts.push(`bytes ${octal(c.value & 0xff, 3)} ${octal(c.value >> 8, 3)} (low first) '${charOf(c.value & 0xff)}${charOf(c.value >> 8)}'`, `decimal ${c.value}, signed ${c.value << 16 >> 16}`);
+    if (c.value !== null) parts.push(`bytes ${octal(c.value & 0xff, 3)} ${octal(c.value >> 8, 3)} (low first) '${charOf(c.value & 0xff)}${charOf(c.value >> 8)}'`, ...numberParts(c.value).slice(1, 4));
     parts.push(`in ${r.name}`);
     if (c.name) parts.push(`label ${c.name}`);
     const v = vectorName(c.address);
@@ -969,6 +971,18 @@ export function startPage(): void {
     el.scrollTop = el.scrollHeight;
   }
 
+  /** Lines with a title each, the elements kept (a title being read stays while the run goes on). */
+  function setLines(box: HTMLElement, lines: Array<{ text: string; title: string }>): void {
+    if (box.firstChild && !(box.firstChild instanceof HTMLDivElement)) box.textContent = '';
+    while (box.children.length > lines.length) box.lastChild!.remove();
+    while (box.children.length < lines.length) box.append(document.createElement('div'));
+    lines.forEach((l, i) => {
+      const e = box.children[i] as HTMLElement;
+      if (e.textContent !== l.text) e.textContent = l.text;
+      if (e.title !== l.title) e.title = l.title;
+    });
+  }
+
   let lastOutput = '';
   function show(): void {
     refresh();
@@ -982,7 +996,8 @@ export function startPage(): void {
       setPcLine.of(cur && !running ? prog!.lineAt.get(pc) ?? null : null),
     ] });
 
-    $('regs').textContent = registerText(cpu);
+    const titles = registerTitles(cpu);
+    setLines($('regs'), registerText(cpu).split('\n').map((text, i) => ({ text, title: titles[i] ?? '' })));
     const out = sim.machine.output;
     if (out !== lastOutput) {
       lastOutput = out;
@@ -1016,9 +1031,12 @@ export function startPage(): void {
       : memoryRows(read, at, 8, 4).map((r) => `${octal(r.address)}  ${r.words.map((w) => (w === null ? '------' : octal(w))).join(' ')}`).join('\n');
     const base = Math.max(sim.stackTop, cpu.r[6] & 0xfffe);
     const st = stackRows(read, cpu.r[6], base);
-    $('stack').textContent = st.length
-      ? st.map((r, i) => `${i ? '    ' : 'SP →'} ${octal(r.address)}  ${octal(r.value)}${nameOf(r.value) ? `  ${nameOf(r.value)}` : ''}`).join('\n')
-      : `Empty: SP = ${octal(cpu.r[6])}; the stack grows down from ${octal(base)}.`;
+    if (st.length) {
+      setLines($('stack'), st.map((r, i) => ({
+        text: `${i ? '    ' : 'SP →'} ${octal(r.address)}  ${octal(r.value)}${nameOf(r.value) ? `  ${nameOf(r.value)}` : ''}`,
+        title: [`${octal(r.address)}: ${octal(r.value)}`, ...numberParts(r.value).slice(1)].join(' · '),
+      })));
+    } else $('stack').textContent = `Empty: SP = ${octal(cpu.r[6])}; the stack grows down from ${octal(base)}.`;
 
     // the screen and its line
     drawScreen();

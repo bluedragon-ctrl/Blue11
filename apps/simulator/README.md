@@ -47,6 +47,12 @@ deployed to GitHub Pages from `main`: **[bluedragon-ctrl.github.io/Blue11](https
   opens the Memory tab at it. **reads/writes** counts each word's reads and writes (the map
   shows them), and **Stop when written** on a word stops the run after the instruction that
   writes it. The CPU's access hook is installed only while either is used.
+- **Numbers explained.** Resting the mouse on a number in the editor (`177777`, `10.`, `^B101`,
+  `'A`, `"HI`, `-1`) or on a label or symbol of the assembled program shows it in octal, decimal
+  (and signed), hex, binary grouped by octal digit, and its two bytes or its character; a number
+  the assembler would refuse (`19`, `200000`) says why. Pointing at a register, the PSW (bit by
+  bit), a stack word or a word in the Memory tab says the same. The parser (`numberAt` in
+  `src/debug.ts`) is tested against the assembler.
 - **Keys.** While the screen or the console has focus ("keyboard → program"), every key goes
   to the keyboard device, and a key that types a character also goes to the console
   ([keyboard spec §7.1](../../docs/BLUE11_KEYBOARD.md)). Ctrl and Cmd shortcuts stay with the
@@ -92,6 +98,7 @@ in mode 1.
 | `src/storage.ts` | Saved programs and share links |
 | `src/help/` | The help: its text (`sections.ts`, `instructions.ts`, `symbols.ts`), the search and F1 lookup (`model.ts`, no DOM), the dialog and the editor's tooltips |
 | `src/editor.ts` | The editor's breakpoint, heat, error and PC decorations (as in HackCode) |
+| `src/number-tip.ts` | The editor's tooltip for numbers and the program's names |
 | `src/page.ts`, `index.html`, `src/style.css` | The page |
 
 It is a host like any other: it uses the library's public API only, from the source next to
