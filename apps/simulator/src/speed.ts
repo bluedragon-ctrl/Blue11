@@ -17,3 +17,10 @@ export function speedLabel(fps: number): string {
   const n = REAL_TIME / fps;
   return Number.isInteger(n) ? `1/${n} of real time` : `${+(fps / REAL_TIME).toFixed(2)}× real time`;
 }
+
+/** A speed in short, for the badge on the settings button: "1/60×", "10×". */
+export function speedShort(fps: number): string {
+  if (fps >= REAL_TIME) return `${+(fps / REAL_TIME).toFixed(2)}×`;
+  const n = REAL_TIME / fps;
+  return Number.isInteger(n) ? `1/${n}×` : `${+(fps / REAL_TIME).toFixed(2)}×`;
+}

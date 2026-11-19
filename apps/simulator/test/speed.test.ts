@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { REAL_TIME, SPEEDS, speedLabel } from '../src/speed';
+import { REAL_TIME, SPEEDS, speedLabel, speedShort } from '../src/speed';
 
 describe('the speed setting', () => {
   it('reads as a share of real time', () => {
@@ -8,5 +8,9 @@ describe('the speed setting', () => {
       '1/2 of real time', 'real time', '2× real time', '4× real time', '10× real time',
     ]);
     expect(SPEEDS).toContain(REAL_TIME);
+  });
+
+  it('in short, for the badge on the settings button', () => {
+    expect(SPEEDS.map(speedShort)).toEqual(['1/60×', '1/30×', '1/12×', '1/6×', '1/3×', '1/2×', '1×', '2×', '4×', '10×']);
   });
 });

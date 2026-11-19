@@ -11,8 +11,10 @@ deployed to GitHub Pages from `main`: **[bluedragon-ctrl.github.io/Blue11](https
   numbers shows how often each line ran. Ctrl+Enter runs, F10 steps.
 - **Run, Continue, Pause, Step, Step frame, Restart.** The machine runs whole frames of 20000
   cycles. **Speed** is shown against real time (1/60 of real time to 10×; real time is 60 frames,
-  ticks of the line clock, per second of wall time), never in cycles per frame, so a program behaves the same at every speed. **Real beam (tearing)** and
-  **EIS** are settings of the machine: changing one starts the program again. Step on a `WAIT`
+  ticks of the line clock, per second of wall time), never in cycles per frame, so a program behaves the same at every speed. **Settings** (the ⚙ next to Help, a
+  dialog) holds Speed, Sound and its volume, Retro, and **Real beam (tearing)** and
+  **EIS**, which are settings of the machine: changing one starts the program again. Away from real time the ⚙
+  shows the speed (`1/2×`), as the slider is out of sight. Step on a `WAIT`
   sleeps to the next interrupt and stops in its handler (at most a frame).
 - **Screen** (the display, mode 0 or 1), **Listing** (the assembler's listing, the PC's row
   lit) and **ROM** (its listing) tabs.

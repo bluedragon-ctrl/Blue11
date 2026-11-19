@@ -20,7 +20,7 @@ import {
 } from './debug';
 import { breakpointLines, debugExtensions, setErrors, setHeat, setPcLine, toggleBreakpointAtCursor } from './editor';
 import { CYCLES_PER_SECOND, cyclesPerSecondAt, lastHalfPeriod } from './audio';
-import { REAL_TIME, SPEEDS, speedLabel } from './speed';
+import { REAL_TIME, SPEEDS, speedLabel, speedShort } from './speed';
 import { HELP, inComment, wordAt } from './help';
 import { helpTooltip } from './help/tooltip';
 import { numberTooltip } from './number-tip';
@@ -241,10 +241,22 @@ export function startPage(): void {
 
   // ---------------------------------------------------------------- settings
 
+  const settingsDialog = $<HTMLDialogElement>('settings');
+  $('show-settings').addEventListener('click', () => settingsDialog.showModal());
+  settingsDialog.querySelector<HTMLButtonElement>('.settings-close')!.addEventListener('click', () => settingsDialog.close());
+  // A click on the backdrop (outside the dialog's box) closes it.
+  settingsDialog.addEventListener('click', (ev) => {
+    const r = settingsDialog.getBoundingClientRect();
+    if (ev.target === settingsDialog && (ev.clientX < r.left || ev.clientX > r.right || ev.clientY < r.top || ev.clientY > r.bottom)) settingsDialog.close();
+  });
+  // Away from real time, the gear says so: the speed is out of sight.
+  const speedBadge = $('speed-badge');
   const speedText = $('speed-text');
   const fps = () => SPEEDS[Number(speed.value)] ?? REAL_TIME;
   function showSpeed(): void {
     speedText.textContent = speedLabel(fps());
+    speedBadge.hidden = fps() === REAL_TIME;
+    speedBadge.textContent = speedShort(fps());
     try { browserStorage()?.setItem('blue11.sim.speed', speed.value); } catch { /* off */ }
   }
   speed.addEventListener('input', () => { speaker.cut(); showSpeed(); });
