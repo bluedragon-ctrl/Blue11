@@ -213,10 +213,13 @@ Index 0 is black, so a cleared screen is black in both modes.
   blank or the next change of `DSPLIN` (§5.1), whichever comes first, in both beam settings, so
   a polling program sees `DONE` and `DSPLIN` on time. `wakeIn()` returns the same number when `IE`
   is set, otherwise Infinity. `canWake()` is `IE`.
-- **The line clock in the simulator** ticks once per frame (`KW11L(frameCycles)`), so it runs at
-  60 Hz, like a real line clock.
-- **The simulator's speed slider** changes how many frames the host runs per second of wall
-  time, never `frameCycles`, so a program behaves the same at every speed.
+- **The line clock in the simulator** is set on its own (`clockCycles`, 20000), not taken from
+  the display: it runs at 60 Hz like a real line clock, the same rate as the screen today. The
+  screen refresh and the tick are different things (pictures, and timing) that happen to be
+  equal; the library already keeps them apart (`SimpleMachine`'s `clockCycles` defaults to
+  `frameCycles` only when not given).
+- **The simulator's speed slider** is a multiple of real time, the CPU clock's rate (1.2 M
+  cycles a second), never `frameCycles`, so a program behaves the same at every speed.
 
 ### 5.1 The scanning beam: tearing, as an option
 

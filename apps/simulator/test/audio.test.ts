@@ -1,6 +1,7 @@
 import type { SoundChunk } from 'blue11';
 import { describe, expect, it } from 'vitest';
-import { History, lastHalfPeriod, Resampler, shouldPlay } from '../src/audio';
+import { History, lastHalfPeriod, Resampler } from '../src/audio';
+import { cyclesPerSecondAt } from '../src/speed';
 import { Simulator } from '../src/sim';
 
 const chunk = (from: number, to: number, level: 0 | 1, edges: Array<[number, 0 | 1]> = []): SoundChunk =>
@@ -56,11 +57,36 @@ describe('edges to samples', () => {
   });
 });
 
-describe('when sound plays', () => {
-  it('only while running at 60 frames a second', () => {
-    expect(shouldPlay(true, 60)).toBe(true);
-    for (const fps of [1, 30, 120, 600]) expect(shouldPlay(true, fps)).toBe(false);
-    expect(shouldPlay(false, 60)).toBe(false);
+describe('sound at other speeds', () => {
+  it('a frame lasts its share of a second of wall time, at every speed', () => {
+    expect(cyclesPerSecondAt(1)).toBe(1_200_000);
+    expect(cyclesPerSecondAt(1 / 2)).toBe(600_000);
+    expect(cyclesPerSecondAt(10)).toBe(12_000_000);
+    const r = new Resampler(48000);
+    r.cyclesPerSecond = cyclesPerSecondAt(1 / 2); // half speed: a frame is 1/30 s, an octave lower
+    expect(r.push(chunk(0, 20000, 0)).length).toBe(1600);
+    r.cyclesPerSecond = cyclesPerSecondAt(10); // 10×: a frame is 1/600 s
+    expect(r.push(chunk(20000, 40000, 0)).length).toBe(80);
+  });
+
+  it('an empty chunk skipped between frames breaks nothing (a sample is a fraction of cycles)', () => {
+    const steady = new Resampler(44100);
+    const skipped = new Resampler(44100);
+    const tone = (f: number) => chunk(f * 20000, (f + 1) * 20000, 0, Array.from({ length: 20 }, (_, k) => [f * 20000 + 1000 * k + 500, ((k + 1) % 2) as 0 | 1]));
+    for (let f = 0; f < 5; f++) {
+      const a = steady.push(tone(f));
+      const b = skipped.push(tone(f));
+      skipped.skip((f + 1) * 20000, 0); // the page's skip of an empty chunk after the frame
+      expect(Array.from(b)).toEqual(Array.from(a));
+    }
+  });
+
+  it('a change of speed goes on from the same cycle, with no gap', () => {
+    const r = new Resampler(44100);
+    let n = r.push(chunk(0, 20000, 0)).length;
+    r.cyclesPerSecond = cyclesPerSecondAt(1 / 60);
+    n += r.push(chunk(20000, 40000, 0)).length;
+    expect(Math.abs(n - (735 + 44100))).toBeLessThanOrEqual(1);
   });
 });
 

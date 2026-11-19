@@ -14,6 +14,7 @@ import { ROM_BASE, ROM_SIZE, romAssembly } from '../rom';
 import { OP_GROUPS, opEntry } from './instructions';
 import { code, dec, entries, h, list, note, p, table, type Block, type Entry, type Section } from './model';
 import { symbolEntries } from './symbols';
+import { CPU_HZ, FRAME_CYCLES, TICK_CYCLES } from '../time';
 
 const o = (n: number, digits = 6) => octal(n, digits);
 const START = 'Start';
@@ -24,8 +25,9 @@ const MACHINE = 'The machine';
 const DEVICES = 'Devices';
 const REFERENCE = 'Reference';
 
-/** Cycles per frame, and so per line-clock tick. */
-const FRAME = 20000;
+/** Cycles per screen frame, and per line-clock tick: two rates, the same today. */
+const FRAME = FRAME_CYCLES;
+const TICK = TICK_CYCLES;
 const RAM_END = DSP.SCREEN;
 
 const e = (anchor: string, names: string[], term: string, text: string, detail?: string): Entry =>
@@ -60,7 +62,7 @@ const start: Section = {
     list(
       'Change `#16` to `#12`, or `4040` to `0000`, and run again. What happens?',
       'Add a second `MOVB` line before the `HALT` to draw another pixel.',
-      'Press **Step** (F10) instead of Run to go one instruction at a time and watch the [registers](registers) change.',
+      'Press **Step instruction** (F10) instead of Run to go one instruction at a time and watch the [registers](registers) change.',
     ),
     h('How a line is written'),
     code(`
@@ -142,9 +144,9 @@ const running: Section = {
     p('To go one step at a time, see [Debugging](debugging).'),
     p('While the program runs, the screen shows a new picture every frame. When it has ended (a `HALT`, or an error), the screen shows the pixel memory as it is, as a real monitor goes on showing it while the CPU stands still.'),
     h('Time and speed'),
-    p(`The machine runs in **frames** of ${dec(FRAME)} cycles; the [display](display) shows one picture per frame, 60 a second. `
-      + 'A **cycle** is one trip to memory, so a short instruction costs 1–3 [cycles](cycles). '
-      + '**Speed** says how many frames run per second of your time (60 is real time). A program behaves exactly the same at every speed: only you see it faster or slower.'),
+    p(`The machine's time is counted in **cycles**: its CPU clock runs ${dec(CPU_HZ)} a second. A cycle is one trip to memory, so a short instruction costs 1–3 [cycles](cycles). `
+      + `Two devices count those cycles, each at its own rate: the [display](display) refreshes the screen every ${dec(FRAME)} cycles (a **frame**, ${CPU_HZ / FRAME} a second), and the [line clock](clock) **ticks** every ${dec(TICK)} cycles (${CPU_HZ / TICK} a second). The two are the same today, but they are different things: the screen is for pictures, the tick for timing. `
+      + '**Speed** (in **Settings**, the ⚙ next to Help) says how fast the machine\'s time runs against **real time**, the CPU clock\'s own rate: from 1/60 of real time to 10× real time. A program behaves exactly the same at every speed: only you see (and hear) it faster or slower.'),
     h('Typing into your program'),
     p('Click the screen or the console first: the label says *keyboard → program*. Now every key goes to the program: to the [keyboard](keyboard) device, and a key that types a character also to the [console](console). '
       + 'Ctrl and Cmd shortcuts stay with the browser. Clicking elsewhere releases every key.'),
@@ -170,8 +172,8 @@ const debugging: Section = {
     p('A program rarely works the first time. The simulator lets you stop it anywhere and look inside: at the registers, the flags, memory and the stack.'),
     h('Stepping'),
     list(
-      '**Step** (F10) runs one instruction. If the code changed, it loads it first. The status line shows how many [cycles](cycles) it took.',
-      '**Step frame** runs to the end of this frame: handy for games that draw once a frame.',
+      '**Step instruction** (F10) runs exactly one instruction, then stops. If the code changed, it loads it first. The status line shows how many [cycles](cycles) it took.',
+      '**Step to next frame** runs every instruction up to the end of this frame (at most 20000 cycles, 1/60 s of the machine\'s time: one picture), then stops; a breakpoint stops it sooner. The status line says how many instructions and cycles that was: often thousands, where Step instruction is one. Handy for a game, which does its work once a frame: one press, one picture.',
       'The current instruction is highlighted in the editor and in the disassembly.',
     ),
     h('Breakpoints'),
@@ -315,7 +317,7 @@ const bigPicture: Section = {
     p('Your program is numbers in memory too (the **Listing** tab shows them). The CPU repeats three steps forever: **fetch** the instruction at the address in PC, move PC past it, **do** it. '
       + 'A jump or branch just puts a new address into PC. `HALT` stops the repeating.'),
     h('Follow a program'),
-    p('This program takes two numbers from memory, adds them in a register, and puts the sum back in memory. Press **Step** (F10) and watch PC, R0 and the word at `C` change:'),
+    p('This program takes two numbers from memory, adds them in a register, and puts the sum back in memory. Press **Step instruction** (F10) and watch PC, R0 and the word at `C` change:'),
     code(`
               MOV  A, R0          ; memory → register:  R0 = 5
               ADD  B, R0          ; memory + register:  R0 = 5 + 3
@@ -455,7 +457,7 @@ const modes: Section = {
       A:      .WORD 5
       B:      .WORD 6
     `, { run: true }),
-    p('Step through them with **Step** (F10) and watch the registers in the **CPU** panel.'),
+    p('Step through them with **Step instruction** (F10) and watch the registers in the **CPU** panel.'),
     h('On the PC'),
     p('`#`, `@#` and labels are really these modes on the PC (R7), the register that points at the instruction being read. The assembler writes them for you:'),
     table(['Write', 'Is', 'Means'], [
@@ -632,7 +634,7 @@ const memory: Section = {
     entries(e('mem-explorer', [], 'The memory explorer (the Memory tab)',
       'The **Memory** tab shows 1000 bytes at a time, 20 to a row, and what each word is: '
         + 'the first word of an **instruction**, an **operand** word (an immediate, an address, an index), **data** from `.WORD`, `.BYTE`, `.ASCII` or `.BLKW`, or the **stack**. '
-        + 'The PC has a frame, SP a green line, a label a dotted underline, and red marks the words the last Step, Step frame or Run changed. Click a word to see its bytes, its label and the line that made it.',
+        + 'The PC has a frame, SP a green line, a label a dotted underline, and red marks the words the last Step instruction, Step to next frame or Run changed. Click a word to see its bytes, its label and the line that made it.',
       'The buttons jump to each region: the PC, SP, the program, the vectors, the page the screen shows, the ROM and the devices. '
         + 'Typed `PC` or `SP`, the view follows the register as it moves. **words**, **bytes** and **instructions** read the same bits three ways: '
         + 'read as instructions, data turns into nonsense instructions, and read as bytes, an instruction shows its two halves. '
@@ -673,7 +675,7 @@ const cycles: Section = {
     p(`A frame is ${dec(FRAME)} cycles: 60 frames make a second of the machine's time. So a game has ${dec(FRAME)} cycles between two pictures to do everything. `
       + 'Clearing a mode 0 page with `CLR (R1)+` and `SOB` costs about 6000 cycles; drawing a character with the [ROM](rom) about 400.'),
     list(
-      '**Step** shows the cycles an instruction took in the status line; the screen\'s line shows the cycle count of the run.',
+      '**Step instruction** shows the cycles an instruction took in the status line; the screen\'s line shows the cycle count of the run.',
       'Keep values in registers inside a loop: a register costs nothing, a variable in memory a cycle each time.',
     ),
     note('Time is cycles, never your clock: the line clock, the display\'s frames and the keyboard\'s events all count cycles. That is why a [replay](debugging) runs exactly the same.'),
@@ -761,7 +763,7 @@ const interrupts: Section = {
     table(['Vector', 'Device', 'Interrupts when'], [
       [o(DEV.VEC_RX, 3), '[console](console) receiver', 'a typed character is waiting in `RBUF`'],
       [o(DEV.VEC_TX, 3), 'console transmitter', 'it is ready for the next character'],
-      [o(DEV.VEC_CLOCK, 3), '[line clock](clock)', 'every tick (once a frame)'],
+      [o(DEV.VEC_CLOCK, 3), '[line clock](clock)', `every tick (${CPU_HZ / TICK} a second)`],
       [o(DSP.VEC, 3), '[display](display-frames) (`DSPVEC`)', 'every vertical blank'],
       [o(KBD.VEC, 3), '[keyboard](keyboard-events) (`KBDVEC`)', 'a key event is waiting in `KBDBUF`'],
     ]),
@@ -828,7 +830,8 @@ const consoleSection: Section = {
 const clock: Section = {
   id: 'clock', title: 'Line clock', group: DEVICES,
   blocks: [
-    p(`The line clock (DEC's KW11-L) ticks once a frame, every ${dec(FRAME)} cycles: 60 times a second of the machine's time. Use it to time things: a game step, a blink, a countdown.`),
+    p(`The line clock (DEC's KW11-L) ticks every ${dec(TICK)} cycles: ${CPU_HZ / TICK} times a second of the machine's time, as the mains power drove it on the original machine. Use it to time things: a game step, a blink, a countdown. `
+      + 'It is not the screen\'s refresh: that is the [display](display-frames)\'s own frame, which happens to have the same rate here. To draw without tearing, wait for the display\'s blank, not the tick.'),
     entries(...symbolEntries('LKS')),
     list(
       'Polling: `BIC #200, @#LKS`, then wait until `TSTB @#LKS` is negative.',
@@ -1028,7 +1031,7 @@ const sound: Section = {
     entries(...symbolEntries('SNDCS', 'SNDDIV')),
     h('In the simulator'),
     list(
-      'Turn **Sound** on in the settings. It plays only at **60 frames/s**, real time: at any other speed, while paused and while stepping it is silent, because the pitch would be wrong.',
+      'Turn **Sound** on in **Settings** (the ⚙ next to Help). At **real time** (the middle of **Speed**) a note plays at its true pitch. At other speeds the sound plays like a tape at the wrong speed: at 1/2 of real time an octave lower and twice as long, at 2× an octave higher; very slow, a note breaks up into clicks, one per switch of the speaker. Paused and stepping, it is silent.',
       'The **Sound** tab draws the speaker over the last frame against a ruler in cycles, and the last half period it measured: you can see a note without hearing it.',
       'A program that prints character 7 (BEL) on the [console](console) rings the bell.',
       'In the Examples menu, under Sound: the **A beeper note**, **A scale**, **A tune** and **Play and draw** examples.',

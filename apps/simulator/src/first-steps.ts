@@ -26,7 +26,7 @@ export const FIRST_STEPS: Array<Omit<Program, 'id' | 'group'>> = [
     source: `
 ; FIRST STEPS 2: registers.
 ; R0-R5 are the CPU's own storage places, called registers.
-; Press Step (F10) again and again, and watch R0 and R1 in the CPU panel.
+; Press Step instruction (F10) again and again, and watch R0 and R1 in the CPU panel.
 ; Numbers are octal: 10 is eight. Write a dot for decimal: 12. is twelve.
         MOV  #5, R0             ; R0 = 5
         MOV  #3, R1             ; R1 = 3

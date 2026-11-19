@@ -4,8 +4,9 @@
  * the memory explorer,
  * the ROM, the examples and saved programs, sharing by URL, the input log, and the help.
  *
- * The machine runs whole frames paced by animation frames. The speed setting (frames per
- * second of wall time) is the only use of wall-clock time, with the speaker's scheduling
+ * The machine runs whole screen frames paced by animation frames, as many as the speed setting
+ * (a multiple of real time, the CPU clock's rate) makes the wall time worth. That is the only
+ * use of wall-clock time, with the speaker's scheduling
  * (src/speaker.ts), and it never reaches the simulation (src/sim.ts), whose time is cycles.
  */
 
@@ -19,7 +20,9 @@ import {
   accessMapRgba, accessText, mapCell, memoryLayout, memoryMapRgba, memoryRows, memorySnapshot, parseAddress, pixelAddress, pixelsOfWord, numberParts, READ_TAKES, regionOf, registerText, registerTitles, ROW_WORDS, stackRows, vectorName, type MemCell, type PixelSpot, type Role,
 } from './debug';
 import { breakpointLines, debugExtensions, setErrors, setHeat, setPcLine, toggleBreakpointAtCursor } from './editor';
-import { CYCLES_PER_SECOND, lastHalfPeriod, shouldPlay } from './audio';
+import { lastHalfPeriod } from './audio';
+import { cyclesPerSecondAt, REAL_TIME, SPEEDS, speedLabel, speedShort } from './speed';
+import { CPU_HZ } from './time';
 import { HELP, inComment, wordAt } from './help';
 import { helpTooltip } from './help/tooltip';
 import { numberTooltip } from './number-tip';
@@ -32,8 +35,6 @@ import { Speaker } from './speaker';
 import { Library, shareHash, sharedProgram } from './storage';
 import { describeTrap } from './traps';
 
-/** The speed slider's stops, in frames per second of wall time (60 is real time). */
-export const SPEEDS = [1, 2, 5, 10, 20, 30, 60, 120, 240, 600];
 /** At most this long (ms) of simulation per animation frame, so the page still answers. */
 const BUDGET_MS = 40;
 
@@ -88,7 +89,7 @@ export function startPage(): void {
   let running = false;
   let animation = 0;
   let lastTime = 0;
-  let owed = 0; // frames owed to the speed setting, fractional
+  let owed = 0; // screen frames owed to the speed setting, fractional
   let resumeNext = false; // the next frame passes a breakpoint at the PC (Continue)
   /** The example open in the editor (its keys hint, its console input), or null. */
   let example: Program | null = null;
@@ -242,13 +243,26 @@ export function startPage(): void {
 
   // ---------------------------------------------------------------- settings
 
+  const settingsDialog = $<HTMLDialogElement>('settings');
+  $('show-settings').addEventListener('click', () => settingsDialog.showModal());
+  settingsDialog.querySelector<HTMLButtonElement>('.settings-close')!.addEventListener('click', () => settingsDialog.close());
+  // A click on the backdrop (outside the dialog's box) closes it.
+  settingsDialog.addEventListener('click', (ev) => {
+    const r = settingsDialog.getBoundingClientRect();
+    if (ev.target === settingsDialog && (ev.clientX < r.left || ev.clientX > r.right || ev.clientY < r.top || ev.clientY > r.bottom)) settingsDialog.close();
+  });
+  // Away from real time, the gear says so: the speed is out of sight.
+  const speedBadge = $('speed-badge');
   const speedText = $('speed-text');
-  const fps = () => SPEEDS[Number(speed.value)] ?? 60;
+  /** The speed: a multiple of real time. */
+  const rate = () => SPEEDS[Number(speed.value)] ?? REAL_TIME;
   function showSpeed(): void {
-    speedText.textContent = `${fps()} frames/s${fps() === 60 ? ' (real time)' : soundOn.checked ? ' (sound: real time only)' : ''}`;
+    speedText.textContent = speedLabel(rate());
+    speedBadge.hidden = rate() === REAL_TIME;
+    speedBadge.textContent = speedShort(rate());
     try { browserStorage()?.setItem('blue11.sim.speed', speed.value); } catch { /* off */ }
   }
-  speed.addEventListener('input', showSpeed);
+  speed.addEventListener('input', () => { speaker.cut(); showSpeed(); });
   const savedSpeed = (() => { try { return browserStorage()?.getItem('blue11.sim.speed'); } catch { return null; } })();
   if (savedSpeed !== null && savedSpeed !== undefined && SPEEDS[Number(savedSpeed)] !== undefined) speed.value = savedSpeed;
   showSpeed();
@@ -352,6 +366,7 @@ export function startPage(): void {
 
   function run(): void {
     if (!load()) return;
+    speaker.cut(); // the last run's sound
     go(false);
   }
 
@@ -373,6 +388,7 @@ export function startPage(): void {
     if (!running) return;
     running = false;
     cancelAnimationFrame(animation);
+    speaker.cut(); // at a slow speed seconds of sound can be queued
     showStatus(`Paused at ${octal(sim.cpu.r[7])}.`);
     show();
   }
@@ -391,7 +407,8 @@ export function startPage(): void {
 
   function tick(now: number): void {
     if (!running) return;
-    owed = Math.min(owed + ((now - lastTime) / 1000) * fps(), 50);
+    // The machine's cycles this wall time is worth, in whole screen frames.
+    owed = Math.min(owed + ((now - lastTime) / 1000) * cyclesPerSecondAt(rate()) / sim.frameCycles, 50);
     lastTime = now;
     syncBreakpoints();
     const until = performance.now() + BUDGET_MS;
@@ -400,8 +417,7 @@ export function startPage(): void {
       owed -= 1;
       const r = sim.runFrame(resumeNext);
       resumeNext = false;
-      const chunk = sim.takeSound();
-      if (shouldPlay(true, fps())) speaker.play(chunk); else speaker.skip(chunk);
+      speaker.play(sim.takeSound(), cyclesPerSecondAt(rate()));
       if (r.stop !== 'frame') stopped(r);
       if (performance.now() > until) { owed = 0; break; }
     }
@@ -434,6 +450,8 @@ export function startPage(): void {
     return `Stopped: the instruction at ${octal(h.pc)} wrote ${what}, ${part}${change}. Step, or Continue.`;
   }
 
+  const plural = (n: number, what: string) => `${n} ${what}${n === 1 ? '' : 's'}`;
+
   function step(): void {
     if (running) return;
     if (!current() || !sim.canRun) {
@@ -445,7 +463,7 @@ export function startPage(): void {
     }
     mark();
     const r = sim.step();
-    if (r.stop === 'step') showStatus(`Stepped: ${r.cycles} cycles.`);
+    if (r.stop === 'step') showStatus(`Stepped one instruction: ${plural(r.cycles, 'cycle')}.`);
     else if (r.stop === 'frame') showStatus('Asleep in WAIT for the whole frame: no interrupt came.');
     else stopped(r);
     show();
@@ -460,7 +478,7 @@ export function startPage(): void {
     syncBreakpoints();
     mark();
     const r = sim.runFrame(true);
-    if (r.stop === 'frame') showStatus(`Frame ${octal(sim.display.frame.number)} done.`);
+    if (r.stop === 'frame') showStatus(`Ran ${plural(r.instructions, 'instruction')} (${plural(r.cycles, 'cycle')}) to the end of the frame: frame ${octal(sim.display.frame.number)} is on the screen.`);
     else stopped(r);
     show();
   });
@@ -953,7 +971,7 @@ export function startPage(): void {
     waveCtx.lineTo(x(t.to), level ? hi : lo);
     waveCtx.stroke();
     waveCtx.lineWidth = 1;
-    const half = lastHalfPeriod(t, CYCLES_PER_SECOND);
+    const half = lastHalfPeriod(t, CPU_HZ);
     const read = (a: number) => sim.machine.read(a, false);
     $('wave-info').textContent = [
       `${t.edges.length} edge${t.edges.length === 1 ? '' : 's'} in the last frame`,

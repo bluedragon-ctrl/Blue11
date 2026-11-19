@@ -182,11 +182,14 @@ The library gives edges; the simulator makes them into sound with the Web Audio 
   At other sample rates a sample is a fraction of cycles, and the same rule applies. A gentle
   high-pass filter removes the constant part, so a speaker left out is silence, not a click
   that never ends. This is a pure function in the simulator's core (`src/sim.ts`), with tests.
-- **Only at real time.** Sound plays only while the program runs at 60 frames a second. At any
-  other speed, while paused, while stepping, and after the program has ended, the speaker is
-  silent: a tune played at the wrong speed would teach the wrong pitch. The page says
-  "sound: real time only" next to the speed when it mutes for this reason.
-- **Scheduling:** each frame's 800 samples are queued just after the last ones, about 3 frames
+- **At every speed, like a tape.** At real time (the CPU clock's own rate, 1.2 M cycles a second) the sound has its true
+  pitch. At another speed a frame's cycles take that much more or less wall time, so the
+  sound plays slower and lower, or faster and higher: at 1/2 of real time an octave lower and
+  twice as long, at 1/60 a note breaks up into single clicks. Students hear what the speed does
+  to the machine's time. (An earlier version was silent away from real time, so that no note
+  was heard at the wrong pitch.) While paused, while stepping and after the program has
+  ended the speaker is silent; a pause or a change of speed cuts off the sound queued.
+- **Scheduling:** each frame's samples (800 at real time) are queued just after the last ones, about 3 frames
   (50 ms) ahead of the audio clock. If the page falls behind (a hidden tab, a slow machine), the
   queue starts again from now rather than playing late.
 - **The browser needs a click first.** Run is a click, so the audio starts there.

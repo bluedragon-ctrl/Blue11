@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { CPU_HZ, FRAME_CYCLES, TICK_CYCLES } from '../src/time';
 import { Simulator } from '../src/sim';
 
 const F = 20000;
@@ -47,6 +48,25 @@ describe('Simulator', () => {
     expect(s.cpu.r[0]).toBe(0);
     expect(s.runFrame(true).stop).toBe('breakpoint'); // Continue: once round the loop
     expect(s.cpu.r[0]).toBe(1);
+  });
+
+  it('sets the screen refresh and the line clock each on its own (both 60 Hz today)', () => {
+    const s = new Simulator();
+    expect(s.frameCycles).toBe(FRAME_CYCLES);
+    expect(s.machine.clockCycles).toBe(TICK_CYCLES);
+    expect(CPU_HZ / FRAME_CYCLES).toBe(60);
+    expect(CPU_HZ / TICK_CYCLES).toBe(60);
+  });
+
+  it('counts the instructions a command ran: one for a step, the frame\'s for a frame', () => {
+    const s = new Simulator();
+    s.load('1$: INC R0\n BR 1$');
+    expect(s.step()).toMatchObject({ stop: 'step', instructions: 1 });
+    const r = s.runFrame();
+    expect(r.stop).toBe('frame');
+    // every INC R0 has a BR beside it
+    expect(Math.abs(r.instructions - 2 * (s.cpu.r[0] - 1))).toBeLessThanOrEqual(1);
+    expect(r.instructions).toBeGreaterThan(1000);
   });
 
   it('steps one instruction; after HALT it goes on with the next', () => {

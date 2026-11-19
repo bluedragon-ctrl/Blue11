@@ -16,6 +16,7 @@
         <button id="delete" class="secondary" title="Delete this saved program from the browser">Delete</button>
         <button id="share" class="secondary" title="Copy a link that opens this program">Share</button>
         <button id="show-help" title="The instructions, addressing modes, devices and the ROM's routines, searchable (F1; in the editor, F1 on a word)">Help</button>
+        <button id="show-settings" class="secondary gear" title="Settings: speed, sound, the real beam, EIS, the look" aria-label="Settings">⚙<span id="speed-badge" hidden></span></button>
       </div>
     </header>
     <main>
@@ -24,19 +25,9 @@
           <button id="run" title="Assemble, load and run from the start (Ctrl+Enter)">Run</button>
           <button id="continue" title="Go on from where the program stopped">Continue</button>
           <button id="pause" title="Stop at the end of this frame">Pause</button>
-          <button id="step" title="One instruction (F10). Breakpoints: click left of a line number, or F9">Step</button>
-          <button id="step-frame" class="secondary" title="Run to the end of this frame">Step frame</button>
+          <button id="step" title="Run exactly one instruction, then stop (F10). Breakpoints: click left of a line number, or F9">Step instruction</button>
+          <button id="step-frame" class="secondary" title="Run every instruction up to the end of this frame (20000 cycles, 1/60 s of machine time: one picture), then stop. For a program that does its work once a frame, such as a game.">Step to next frame</button>
           <button id="restart" class="secondary" title="Load the program again, stopped at its first instruction">Restart</button>
-        </div>
-        <div class="toolbar settings">
-          <label class="speed" title="How many of the machine's frames (20000 cycles each) run per second of your time. 60 is real time.">Speed
-            <input id="speed" type="range" min="0" max="9" value="6"> <span id="speed-text"></span>
-          </label>
-          <label title="The real beam draws the picture row by row while the program runs, so changing the page or palette mid-frame tears. Changing it restarts the program."><input id="beam" type="checkbox"> Real beam (tearing)</label>
-          <label title="The Extended Instruction Set: MUL, DIV, ASH, ASHC. Changing it restarts the program."><input id="eis" type="checkbox"> EIS</label>
-          <label title="The speaker (SNDCS, SNDDIV). It plays only at 60 frames/s, real time: at any other speed the pitch would be wrong."><input id="sound" type="checkbox"> Sound</label>
-          <label class="volume" title="The speaker's volume">Volume <input id="volume" type="range" min="0" max="100" step="5"></label>
-          <label title="The look of the period: the screen as a CRT, the listings printed on fan-fold paper, the console as an amber terminal. The editor and the debugger stay as they are."><input id="retro" type="checkbox"> Retro</label>
         </div>
         <div id="status"></div>
         <div id="editor"></div>
@@ -151,6 +142,31 @@
         <nav class="help-nav"></nav>
         <article class="help-content"></article>
       </div>
+    </dialog>
+    <dialog id="settings" class="settings-dialog">
+      <div class="toolbar">
+        <h2>Settings</h2>
+        <button class="settings-close secondary">Close</button>
+      </div>
+      <form method="dialog" class="settings">
+        <h3>Time</h3>
+        <label class="row speed">Speed
+          <input id="speed" type="range" min="0" max="9" value="6"> <span id="speed-text"></span>
+        </label>
+        <p class="why">How fast the machine's time runs against real time. Real time is the CPU clock's own rate, 1200000 cycles a second: then the screen refreshes 60 times a second and the line clock ticks 60 times a second, two separate rates that happen to be equal. A program behaves exactly the same at every speed; its sound plays slower and lower, or faster and higher, like a tape.</p>
+        <h3>Sound</h3>
+        <label class="row"><input id="sound" type="checkbox"> Sound</label>
+        <p class="why">The speaker (SNDCS, SNDDIV). At real time it plays at its true pitch; slower is lower, faster is higher.</p>
+        <label class="row volume">Volume <input id="volume" type="range" min="0" max="100" step="5"></label>
+        <h3>The machine <span class="note">(changing one restarts the program)</span></h3>
+        <label class="row"><input id="beam" type="checkbox"> Real beam (tearing)</label>
+        <p class="why">The real beam draws the picture row by row while the program runs, so changing the page or palette mid-frame tears.</p>
+        <label class="row"><input id="eis" type="checkbox"> EIS</label>
+        <p class="why">The Extended Instruction Set: MUL, DIV, ASH, ASHC.</p>
+        <h3>Look</h3>
+        <label class="row"><input id="retro" type="checkbox"> Retro</label>
+        <p class="why">The look of the period: the screen as a CRT, the listings printed on fan-fold paper, the console as an amber terminal. The editor and the debugger stay as they are.</p>
+      </form>
     </dialog>
     <script type="module" src="./src/main.ts"></script>
   </body>

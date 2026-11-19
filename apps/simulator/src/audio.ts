@@ -7,14 +7,7 @@
  */
 
 import type { Edge, SoundChunk } from 'blue11';
-
-/** The machine's speed: 60 frames of 20000 cycles a second. */
-export const CYCLES_PER_SECOND = 1_200_000;
-
-/** Sound plays only at real time, while the program runs. */
-export function shouldPlay(running: boolean, fps: number): boolean {
-  return running && fps === 60;
-}
+import { CPU_HZ } from './time';
 
 /** The share of `[a, b)` the speaker was out, given its level at `from` and the edges after it. */
 function outShare(level: 0 | 1, edges: readonly Edge[], start: number, a: number, b: number): { share: number; level: 0 | 1; start: number } {
@@ -39,8 +32,8 @@ function outShare(level: 0 | 1, edges: readonly Edge[], start: number, a: number
  * Samples run on from chunk to chunk; `skip` jumps over time not played.
  */
 export class Resampler {
-  /** Cycles per sample: 25 at 48 kHz. */
-  readonly step: number;
+  /** Cycles per sample: 25 at 48 kHz and real time. */
+  private stepCycles: number;
   /** The cycle where the next sample starts (fractional). */
   private pos = 0;
   /** The filter's last input and output: it starts with the speaker in, in silence. */
@@ -48,11 +41,20 @@ export class Resampler {
   private prevOut = 0;
   private readonly a: number;
 
-  constructor(readonly sampleRate: number, readonly cyclesPerSecond = CYCLES_PER_SECOND, cutoffHz = 20) {
-    this.step = cyclesPerSecond / sampleRate;
+  constructor(readonly sampleRate: number, cyclesPerSecond = CPU_HZ, cutoffHz = 20) {
+    this.stepCycles = cyclesPerSecond / sampleRate;
     const rc = 1 / (2 * Math.PI * cutoffHz);
     this.a = rc / (rc + 1 / sampleRate);
   }
+
+  get step(): number { return this.stepCycles; }
+
+  /**
+   * The machine's speed against the wall clock, in cycles per second: away from real time
+   * (1200000) the sound plays slower and lower, or faster and higher, like a tape.
+   */
+  set cyclesPerSecond(c: number) { this.stepCycles = c / this.sampleRate; }
+  get cyclesPerSecond(): number { return this.stepCycles * this.sampleRate; }
 
   /** The samples for a chunk (values about −1 to 1). After a gap, it starts again at the chunk. */
   push(chunk: SoundChunk): Float32Array<ArrayBuffer> {
@@ -83,9 +85,10 @@ export class Resampler {
     return out;
   }
 
-  /** Nothing is played up to cycle `to` (paused, another speed): start from there, in silence. */
+  /** Nothing is played up to cycle `to` (paused, stepping): start from there, in silence. */
   skip(to: number, level: 0 | 1): void {
-    if (this.pos >= to) return;
+    // Less than a sample not played is no gap: the next push goes on from here.
+    if (this.pos > to - this.step) return;
     this.pos = to;
     this.prevIn = 2 * level - 1;
     this.prevOut = 0;
@@ -128,7 +131,7 @@ export class History {
  * What the waveform view says about the last edges: the cycles between the last two, and the
  * frequency they make, or null with fewer than two.
  */
-export function lastHalfPeriod(t: Trace, cyclesPerSecond = CYCLES_PER_SECOND): { cycles: number; hz: number } | null {
+export function lastHalfPeriod(t: Trace, cyclesPerSecond = CPU_HZ): { cycles: number; hz: number } | null {
   const e = t.edges;
   if (e.length < 2) return null;
   const cycles = e[e.length - 1].cycle - e[e.length - 2].cycle;

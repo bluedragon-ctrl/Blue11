@@ -9,10 +9,17 @@ deployed to GitHub Pages from `main`: **[bluedragon-ctrl.github.io/Blue11](https
 - **The editor** (CodeMirror with the library's highlighting). Assembler errors are shown on
   their lines. Breakpoints: click left of a line number, or F9. A heat bar beside the line
   numbers shows how often each line ran. Ctrl+Enter runs, F10 steps.
-- **Run, Continue, Pause, Step, Step frame, Restart.** The machine runs whole frames of 20000
-  cycles. **Speed** is in frames per second of wall time (1–600; 60 is real time), never in
-  cycles per frame, so a program behaves the same at every speed. **Real beam (tearing)** and
-  **EIS** are settings of the machine: changing one starts the program again. Step on a `WAIT`
+- **Run, Continue, Pause, Step instruction, Step to next frame, Restart.** Step instruction
+  runs one instruction; Step to next frame runs every instruction to the end of the frame,
+  and the status line says how many. Time is cycles, with three rates
+  in `src/time.ts`: the CPU clock (`CPU_HZ`, 1200000 a second), the screen refresh
+  (`FRAME_CYCLES`, 20000: 60 Hz) and the line clock's tick (`TICK_CYCLES`, 20000: 60 Hz). The
+  last two are separate settings of the machine that start out equal. The page runs whole
+  screen frames. **Speed** is a multiple of real time, the CPU clock's rate (1/60 to 10×),
+  never in cycles per frame, so a program behaves the same at every speed. **Settings** (the ⚙ next to Help, a
+  dialog) holds Speed, Sound and its volume, Retro, and **Real beam (tearing)** and
+  **EIS**, which are settings of the machine: changing one starts the program again. Away from real time the ⚙
+  shows the speed (`1/2×`), as the slider is out of sight. Step on a `WAIT`
   sleeps to the next interrupt and stops in its handler (at most a frame).
 - **Screen** (the display, mode 0 or 1), **Listing** (the assembler's listing, the PC's row
   lit) and **ROM** (its listing) tabs.
@@ -23,9 +30,10 @@ deployed to GitHub Pages from `main`: **[bluedragon-ctrl.github.io/Blue11](https
   Otherwise a program that halts within its first frame would leave the screen black.
 - **Console** (the DL11 terminal), below the tabs, so it stays in view with each of them.
 - **Sound** (on unless turned off, with its volume, kept in the browser): the speaker
-  (`SNDCS`, `SNDDIV`, [sound spec](../../docs/BLUE11_SOUND.md)) played with Web Audio. It plays
-  only at 60 frames/s, real time, and is silent at other speeds, while paused and while
-  stepping, so a note is never heard at the wrong pitch. The **Sound** tab draws the speaker over
+  (`SNDCS`, `SNDDIV`, [sound spec](../../docs/BLUE11_SOUND.md)) played with Web Audio. At real
+  time it plays at its true pitch; at other speeds it plays like a tape at the
+  wrong speed (half speed: an octave lower), so students hear what the speed does to the
+  ticks. It is silent while paused and while stepping. The **Sound** tab draws the speaker over
   the last frame against a ruler in cycles, with the last half period it measured. A program
   that prints BEL (7) on the console rings a bell. The edges become samples in `src/audio.ts`
   (no DOM, tested); `src/speaker.ts` queues them a little ahead of the audio clock.

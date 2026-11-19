@@ -11,6 +11,7 @@ import {
   assemble, DSP, octal, SimpleMachine, type AsmError, type AssembleResult, type Beam, type Frame, type Key, type SoundChunk, type StopReason, type TrapInfo,
 } from 'blue11';
 import { History } from './audio';
+import { FRAME_CYCLES, TICK_CYCLES } from './time';
 import { makeRom, programSymbols } from './rom';
 
 /** One input of a run, at the cycle it happened. */
@@ -34,6 +35,8 @@ export type Stop = Exclude<StopReason, 'budget' | 'wait'> | 'frame' | 'asleep' |
 export interface StepResult {
   stop: Stop | 'step';
   cycles: number;
+  /** Instructions the command ran (an interrupt's handler included). */
+  instructions: number;
   trap?: TrapInfo;
   /** For 'watch': the write. */
   watch?: WatchHit;
@@ -126,7 +129,7 @@ export class Simulator {
   /** The trap the CPU stopped on (a vector with no handler). */
   trap: TrapInfo | null = null;
   /** The speaker's last frame of edges, for the waveform view (one frame of cycles). */
-  readonly history = new History(20000);
+  readonly history = new History(FRAME_CYCLES);
   /** BEL characters (7) the program printed and the page has not rung yet. */
   bells = 0;
 
@@ -145,6 +148,8 @@ export class Simulator {
   private count = 0;
   /** `count` when the watched word was written. */
   private hitCount = 0;
+  /** `count` when the command began. */
+  private startCount = 0;
 
   /** Characters typed on the console (the keyboard keeps its own log). */
   private typed: Array<{ cycle: number; ch: number }> = [];
@@ -158,7 +163,8 @@ export class Simulator {
   }
 
   private build(): void {
-    const m = new SimpleMachine({ display: { beam: this.beam }, keyboard: true, sound: true, eis: this.eis });
+    const m = new SimpleMachine({
+      display: { beam: this.beam, frameCycles: FRAME_CYCLES }, clockCycles: TICK_CYCLES, keyboard: true, sound: true, eis: this.eis });
     m.add(makeRom());
     m.onOutput = (ch) => { if (ch === '\x07') this.bells++; };
     // A trap through an empty vector stops instead of jumping to 0 and running the vectors.
@@ -268,7 +274,7 @@ export class Simulator {
   get keyboard() { return this.machine.keyboard!; }
   get sound() { return this.machine.sound!; }
   get cpu() { return this.machine.cpu; }
-  /** Cycles per frame (20000). */
+  /** Cycles per screen frame (FRAME_CYCLES). */
   get frameCycles(): number { return this.display.frameCycles; }
 
   /** Another beam or EIS setting: a new machine, and the program (if any) booted again from the start. */
@@ -427,6 +433,7 @@ export class Simulator {
 
   /** A command starts: no trap, no watch hit yet, the watched words as they are. */
   private begin(): void {
+    this.startCount = this.count;
     this.trap = null;
     this.hit = null;
     this.watchHit = null;
@@ -448,7 +455,7 @@ export class Simulator {
       if (stop !== 'trap' && stop !== 'double-fault') stop = 'watch';
     }
     this.last = stop;
-    return { stop, cycles, trap: this.trap ?? undefined, watch: this.watchHit ?? undefined };
+    return { stop, cycles, instructions: this.count - this.startCount, trap: this.trap ?? undefined, watch: this.watchHit ?? undefined };
   }
 
   /** The address of the first instruction on source line `line`, or null. */

@@ -23,10 +23,17 @@ main { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 21rem
 .pane { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 0.75rem; min-width: 0; }
 .toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 0.5rem; }
 .code .toolbar button { padding: 0.3rem 0.7rem; }
-.settings { font-size: 0.85rem; gap: 1rem; }
-.settings label { display: flex; align-items: center; gap: 0.35rem; opacity: 0.9; }
-#speed { width: 8rem; accent-color: var(--accent); }
-#speed-text { min-width: 9ch; }
+.gear { font-size: 1.05rem; line-height: 1; padding: 0.25rem 0.5rem; }
+#speed-badge { font-size: 0.75rem; margin-left: 0.35rem; color: var(--warn); }
+dialog.settings-dialog { width: min(34rem, 92vw); }
+.settings-dialog .toolbar { justify-content: space-between; }
+.settings { font-size: 0.9rem; }
+.settings h3 { color: var(--accent); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.08em; margin: 1rem 0 0.35rem; }
+.settings h3 .note { text-transform: none; letter-spacing: 0; opacity: 0.6; color: var(--fg); }
+.settings .row { display: flex; align-items: center; gap: 0.5rem; margin: 0.3rem 0; }
+.settings .why { margin: 0 0 0.4rem 1.6rem; font-size: 0.8rem; opacity: 0.65; font-family: system-ui, sans-serif; line-height: 1.35; }
+.settings .speed + .why, .settings .volume + .why { margin-left: 0; }
+#speed { width: 12rem; accent-color: var(--accent); }
 button { background: transparent; color: var(--accent); border: 1px solid var(--accent); border-radius: 4px; padding: 0.3rem 1rem; font: inherit; cursor: pointer; }
 button:hover { background: #39d0ff22; }
 button.secondary { color: var(--fg); border-color: var(--line); }
