@@ -34,6 +34,8 @@ export type Stop = Exclude<StopReason, 'budget' | 'wait'> | 'frame' | 'asleep' |
 export interface StepResult {
   stop: Stop | 'step';
   cycles: number;
+  /** Instructions the command ran (an interrupt's handler included). */
+  instructions: number;
   trap?: TrapInfo;
   /** For 'watch': the write. */
   watch?: WatchHit;
@@ -145,6 +147,8 @@ export class Simulator {
   private count = 0;
   /** `count` when the watched word was written. */
   private hitCount = 0;
+  /** `count` when the command began. */
+  private startCount = 0;
 
   /** Characters typed on the console (the keyboard keeps its own log). */
   private typed: Array<{ cycle: number; ch: number }> = [];
@@ -427,6 +431,7 @@ export class Simulator {
 
   /** A command starts: no trap, no watch hit yet, the watched words as they are. */
   private begin(): void {
+    this.startCount = this.count;
     this.trap = null;
     this.hit = null;
     this.watchHit = null;
@@ -448,7 +453,7 @@ export class Simulator {
       if (stop !== 'trap' && stop !== 'double-fault') stop = 'watch';
     }
     this.last = stop;
-    return { stop, cycles, trap: this.trap ?? undefined, watch: this.watchHit ?? undefined };
+    return { stop, cycles, instructions: this.count - this.startCount, trap: this.trap ?? undefined, watch: this.watchHit ?? undefined };
   }
 
   /** The address of the first instruction on source line `line`, or null. */

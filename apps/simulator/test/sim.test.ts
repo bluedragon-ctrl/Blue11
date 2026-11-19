@@ -49,6 +49,17 @@ describe('Simulator', () => {
     expect(s.cpu.r[0]).toBe(1);
   });
 
+  it('counts the instructions a command ran: one for a step, the frame\'s for a frame', () => {
+    const s = new Simulator();
+    s.load('1$: INC R0\n BR 1$');
+    expect(s.step()).toMatchObject({ stop: 'step', instructions: 1 });
+    const r = s.runFrame();
+    expect(r.stop).toBe('frame');
+    // every INC R0 has a BR beside it
+    expect(Math.abs(r.instructions - 2 * (s.cpu.r[0] - 1))).toBeLessThanOrEqual(1);
+    expect(r.instructions).toBeGreaterThan(1000);
+  });
+
   it('steps one instruction; after HALT it goes on with the next', () => {
     const s = new Simulator();
     s.load(' MOV #5, R0\n HALT\n INC R0\n HALT');

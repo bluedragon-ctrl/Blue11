@@ -446,6 +446,8 @@ export function startPage(): void {
     return `Stopped: the instruction at ${octal(h.pc)} wrote ${what}, ${part}${change}. Step, or Continue.`;
   }
 
+  const plural = (n: number, what: string) => `${n} ${what}${n === 1 ? '' : 's'}`;
+
   function step(): void {
     if (running) return;
     if (!current() || !sim.canRun) {
@@ -457,7 +459,7 @@ export function startPage(): void {
     }
     mark();
     const r = sim.step();
-    if (r.stop === 'step') showStatus(`Stepped: ${r.cycles} cycles.`);
+    if (r.stop === 'step') showStatus(`Stepped one instruction: ${plural(r.cycles, 'cycle')}.`);
     else if (r.stop === 'frame') showStatus('Asleep in WAIT for the whole frame: no interrupt came.');
     else stopped(r);
     show();
@@ -472,7 +474,7 @@ export function startPage(): void {
     syncBreakpoints();
     mark();
     const r = sim.runFrame(true);
-    if (r.stop === 'frame') showStatus(`Frame ${octal(sim.display.frame.number)} done.`);
+    if (r.stop === 'frame') showStatus(`Ran ${plural(r.instructions, 'instruction')} (${plural(r.cycles, 'cycle')}) to the end of the frame: frame ${octal(sim.display.frame.number)} is on the screen.`);
     else stopped(r);
     show();
   });

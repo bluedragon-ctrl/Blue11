@@ -9,7 +9,9 @@ deployed to GitHub Pages from `main`: **[bluedragon-ctrl.github.io/Blue11](https
 - **The editor** (CodeMirror with the library's highlighting). Assembler errors are shown on
   their lines. Breakpoints: click left of a line number, or F9. A heat bar beside the line
   numbers shows how often each line ran. Ctrl+Enter runs, F10 steps.
-- **Run, Continue, Pause, Step, Step frame, Restart.** The machine runs whole frames of 20000
+- **Run, Continue, Pause, Step instruction, Step to next frame, Restart.** Step instruction
+  runs one instruction; Step to next frame runs every instruction to the end of the frame,
+  and the status line says how many. The machine runs whole frames of 20000
   cycles. **Speed** is shown against real time (1/60 of real time to 10×; real time is 60 frames,
   ticks of the line clock, per second of wall time), never in cycles per frame, so a program behaves the same at every speed. **Settings** (the ⚙ next to Help, a
   dialog) holds Speed, Sound and its volume, Retro, and **Real beam (tearing)** and

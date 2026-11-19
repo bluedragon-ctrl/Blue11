@@ -60,7 +60,7 @@ const start: Section = {
     list(
       'Change `#16` to `#12`, or `4040` to `0000`, and run again. What happens?',
       'Add a second `MOVB` line before the `HALT` to draw another pixel.',
-      'Press **Step** (F10) instead of Run to go one instruction at a time and watch the [registers](registers) change.',
+      'Press **Step instruction** (F10) instead of Run to go one instruction at a time and watch the [registers](registers) change.',
     ),
     h('How a line is written'),
     code(`
@@ -170,8 +170,8 @@ const debugging: Section = {
     p('A program rarely works the first time. The simulator lets you stop it anywhere and look inside: at the registers, the flags, memory and the stack.'),
     h('Stepping'),
     list(
-      '**Step** (F10) runs one instruction. If the code changed, it loads it first. The status line shows how many [cycles](cycles) it took.',
-      '**Step frame** runs to the end of this frame: handy for games that draw once a frame.',
+      '**Step instruction** (F10) runs exactly one instruction, then stops. If the code changed, it loads it first. The status line shows how many [cycles](cycles) it took.',
+      '**Step to next frame** runs every instruction up to the end of this frame (at most 20000 cycles, 1/60 s of the machine\'s time: one picture), then stops; a breakpoint stops it sooner. The status line says how many instructions and cycles that was: often thousands, where Step instruction is one. Handy for a game, which does its work once a frame: one press, one picture.',
       'The current instruction is highlighted in the editor and in the disassembly.',
     ),
     h('Breakpoints'),
@@ -315,7 +315,7 @@ const bigPicture: Section = {
     p('Your program is numbers in memory too (the **Listing** tab shows them). The CPU repeats three steps forever: **fetch** the instruction at the address in PC, move PC past it, **do** it. '
       + 'A jump or branch just puts a new address into PC. `HALT` stops the repeating.'),
     h('Follow a program'),
-    p('This program takes two numbers from memory, adds them in a register, and puts the sum back in memory. Press **Step** (F10) and watch PC, R0 and the word at `C` change:'),
+    p('This program takes two numbers from memory, adds them in a register, and puts the sum back in memory. Press **Step instruction** (F10) and watch PC, R0 and the word at `C` change:'),
     code(`
               MOV  A, R0          ; memory → register:  R0 = 5
               ADD  B, R0          ; memory + register:  R0 = 5 + 3
@@ -455,7 +455,7 @@ const modes: Section = {
       A:      .WORD 5
       B:      .WORD 6
     `, { run: true }),
-    p('Step through them with **Step** (F10) and watch the registers in the **CPU** panel.'),
+    p('Step through them with **Step instruction** (F10) and watch the registers in the **CPU** panel.'),
     h('On the PC'),
     p('`#`, `@#` and labels are really these modes on the PC (R7), the register that points at the instruction being read. The assembler writes them for you:'),
     table(['Write', 'Is', 'Means'], [
@@ -632,7 +632,7 @@ const memory: Section = {
     entries(e('mem-explorer', [], 'The memory explorer (the Memory tab)',
       'The **Memory** tab shows 1000 bytes at a time, 20 to a row, and what each word is: '
         + 'the first word of an **instruction**, an **operand** word (an immediate, an address, an index), **data** from `.WORD`, `.BYTE`, `.ASCII` or `.BLKW`, or the **stack**. '
-        + 'The PC has a frame, SP a green line, a label a dotted underline, and red marks the words the last Step, Step frame or Run changed. Click a word to see its bytes, its label and the line that made it.',
+        + 'The PC has a frame, SP a green line, a label a dotted underline, and red marks the words the last Step instruction, Step to next frame or Run changed. Click a word to see its bytes, its label and the line that made it.',
       'The buttons jump to each region: the PC, SP, the program, the vectors, the page the screen shows, the ROM and the devices. '
         + 'Typed `PC` or `SP`, the view follows the register as it moves. **words**, **bytes** and **instructions** read the same bits three ways: '
         + 'read as instructions, data turns into nonsense instructions, and read as bytes, an instruction shows its two halves. '
@@ -673,7 +673,7 @@ const cycles: Section = {
     p(`A frame is ${dec(FRAME)} cycles: 60 frames make a second of the machine's time. So a game has ${dec(FRAME)} cycles between two pictures to do everything. `
       + 'Clearing a mode 0 page with `CLR (R1)+` and `SOB` costs about 6000 cycles; drawing a character with the [ROM](rom) about 400.'),
     list(
-      '**Step** shows the cycles an instruction took in the status line; the screen\'s line shows the cycle count of the run.',
+      '**Step instruction** shows the cycles an instruction took in the status line; the screen\'s line shows the cycle count of the run.',
       'Keep values in registers inside a loop: a register costs nothing, a variable in memory a cycle each time.',
     ),
     note('Time is cycles, never your clock: the line clock, the display\'s frames and the keyboard\'s events all count cycles. That is why a [replay](debugging) runs exactly the same.'),
