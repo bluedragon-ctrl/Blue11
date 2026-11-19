@@ -255,6 +255,7 @@ dialog.help[open] { display: flex; }
 .help-tip-head .detail { font-family: ui-monospace, 'Cascadia Code', 'Fira Code', Menlo, monospace; font-size: 0.75rem; opacity: 0.6; }
 .help-tip code { font-family: ui-monospace, 'Cascadia Code', 'Fira Code', Menlo, monospace; color: #fff; background: #ffffff12; padding: 0 0.2em; border-radius: 3px; }
 .help-tip a { color: var(--accent); }
+.number-tip .help-tip-head, .number-tip-row { font-family: ui-monospace, 'Cascadia Code', 'Fira Code', Menlo, monospace; font-size: 0.8rem; }
 @media (max-width: 800px) { .help-body { grid-template-columns: 1fr; } .help-nav { display: none; } }
 .screen-at { opacity: 0.6; font-size: 0.85rem; min-height: 2.4em; }
 .mx-rows .pbyte { outline: 1px solid #39d0ff; outline-offset: 1px; }

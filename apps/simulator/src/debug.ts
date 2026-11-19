@@ -6,7 +6,7 @@
  * are octal.
  */
 
-import { disassemble, octal, PSW_ADDRESS, REGISTER_NAMES, REGISTERS, type AssembleResult, type Cpu } from 'blue11';
+import { commentStart, disassemble, octal, PSW_ADDRESS, REGISTER_NAMES, REGISTERS, type AssembleResult, type Cpu } from 'blue11';
 import { SIM_SYMBOLS } from '../../../packages/blue11/examples/examples';
 import { ROM_BASE, ROM_SIZE, romAssembly } from './rom';
 
@@ -376,4 +376,101 @@ export function pixelsOfWord(address: number, mode: number, page: number): { x: 
   const off = (address & 0xfffe) - pageBase(mode, page);
   if (off < 0 || off >= (mode ? 0o20000 : 0o10000)) return null;
   return { x: (off & 0o77) * (mode ? 2 : 1), y: off >> 6, n: mode ? 4 : 2 };
+}
+
+// ---------------------------------------------------------------- numbers explained
+
+/** Names of the characters that have no picture, or are easy to miss. */
+const CHAR_NAMES: Record<number, string> = {
+  0: 'NUL', 7: 'BEL (the console rings)', 0o10: 'BS (backspace)', 0o11: 'TAB', 0o12: 'LF (line feed)',
+  0o15: 'CR (carriage return)', 0o33: 'ESC', 0o40: 'space', 0o177: 'DEL',
+};
+
+/** A byte as a character: `'A'`, a control's name, or null above 177. */
+export function charName(b: number): string | null {
+  if (CHAR_NAMES[b]) return CHAR_NAMES[b];
+  if (b > 0o40 && b < 0o177) return `'${String.fromCharCode(b)}'`;
+  if (b < 0o40) return `control ^${String.fromCharCode(b + 0o100)}`;
+  return null;
+}
+
+/** 16 bits grouped as octal digits, the top bit alone: `1 111 111 111 111 111`. */
+export function binaryOctal(v: number): string {
+  const b = (v & 0xffff).toString(2).padStart(16, '0');
+  return [b[0], ...b.slice(1).match(/.../g)!].join(' ');
+}
+
+/**
+ * A word in every base a student meets: octal first (as written on the machine), decimal and
+ * signed, hex, binary grouped by octal digit (why octal fits the PDP-11), and the two bytes in
+ * octal or the character. One item per entry.
+ */
+export function numberParts(v: number): string[] {
+  v &= 0xffff;
+  const signed = v << 16 >> 16;
+  const parts = [`octal ${octal(v)}`, `decimal ${v}.${signed < 0 ? `, signed ${signed}.` : ''}`,
+    `hex ${v.toString(16).toUpperCase().padStart(4, '0')}`, `binary ${binaryOctal(v)}`];
+  if (v > 0o377) parts.push(`bytes: high ${octal(v >> 8, 3)}, low ${octal(v & 0xff, 3)}`);
+  else if (v && (v >= 0o40 || CHAR_NAMES[v]) && charName(v)) parts.push(`character ${charName(v)}`);
+  return parts;
+}
+
+/** The PSW, bit by bit. */
+export function pswParts(psw: number): string[] {
+  const mode = (m: number) => (['kernel', 'supervisor', 'mode 2', 'user'][m]);
+  const parts = [`PSW ${octal(psw)}`, `binary ${binaryOctal(psw)}`];
+  if (psw >> 12) parts.push(`mode ${mode(psw >> 14)} (bits 15–14), previous ${mode((psw >> 12) & 3)} (13–12)`);
+  parts.push(`priority ${(psw >> 5) & 7} (bits 7–5)`, `T ${(psw >> 4) & 1} (trace, bit 4)`,
+    `N ${(psw >> 3) & 1} (negative) · Z ${(psw >> 2) & 1} (zero) · V ${(psw >> 1) & 1} (overflow) · C ${psw & 1} (carry)`);
+  return parts;
+}
+
+/** What to say when pointing at each line of `registerText`. */
+export function registerTitles(cpu: Cpu): string[] {
+  return [...REGISTER_NAMES.map((n, i) => [`${n} = ${octal(cpu.r[i])}`, ...numberParts(cpu.r[i]).slice(1)].join(' · ')),
+    pswParts(cpu.psw).join(' · ')];
+}
+
+/** A number as written in the editor, where the mouse is, with its value (or why it is not one). */
+export interface NumberAt { from: number; to: number; text: string; value?: number; error?: string }
+
+/**
+ * The number literal at `col` of a source line, read by the assembler's rules: octal digits,
+ * `10.` decimal, `^D` `^O` `^B` with digits, `^C` before one of these, `'A` and `"AB`, and a
+ * unary minus in front. Not a symbol (`R0`, `1$`, `L10`), not in a comment or `.ASCII` text.
+ */
+export function numberAt(line: string, col: number): NumberAt | null {
+  const cut = commentStart(line);
+  if (cut >= 0 && col >= cut) return null;
+  const asc = /\.ASCI[IZ]\b/i.exec(line);
+  if (asc && col >= asc.index) return null;
+  const re = /(-?)(\^C)?(?:(\^[DOBdob])([0-9]+)|([0-9]+)(\.?)(?![A-Za-z0-9$_])|'([\s\S])|"([\s\S]{2}))/g;
+  for (let m; (m = re.exec(line.slice(0, cut >= 0 ? cut : undefined)));) {
+    const from = m.index;
+    const to = from + m[0].length;
+    // part of a name (R0, L10, 1$) or a quote's character
+    if (from > 0 && /[A-Za-z0-9$_.'"]/.test(line[from - 1]) && !m[1]) continue;
+    if (col < from || col >= to) continue;
+    // a minus is unary only after an operator, a bracket, # @ , or a space
+    let start = from;
+    let neg = !!m[1];
+    if (neg && from > 0 && !/[\s#@,(<+\-*/&!]/.test(line[from - 1])) { neg = false; start++; }
+    if (col < start) continue;
+    const text = line.slice(start, to);
+    let v: number;
+    if (m[3]) {
+      const radix = { D: 10, O: 8, B: 2 }[m[3][1].toUpperCase() as 'D' | 'O' | 'B'];
+      if ([...m[4]].some((d) => +d >= radix)) return { from: start, to, text, error: `bad digit for ${m[3].toUpperCase()}: ${m[4]}` };
+      v = parseInt(m[4], radix);
+    } else if (m[5] !== undefined) {
+      if (!m[6] && /[89]/.test(m[5])) return { from: start, to, text, error: `${m[5]} is not octal: write ${m[5]}. for decimal` };
+      v = parseInt(m[5], m[6] ? 10 : 8);
+    } else if (m[7] !== undefined) v = m[7].charCodeAt(0) & 0xff;
+    else v = (m[8].charCodeAt(0) & 0xff) | ((m[8].charCodeAt(1) & 0xff) << 8);
+    if (v > 0xffff) return { from: start, to, text, error: `${text.replace(/^-|\^C/gi, '')} doesn't fit 16 bits (177777 or 65535. at most)` };
+    if (m[2]) v = ~v & 0xffff;
+    if (neg) v = -v & 0xffff;
+    return { from: start, to, text, value: v };
+  }
+  return null;
 }
