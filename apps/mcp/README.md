@@ -38,10 +38,16 @@ Set `BLUE11_SIMULATOR_URL` to make share links point to another simulator, such 
 | `screen` | The screen as the simulator shows it, or pixel memory as it is now |
 | `share_link` | The simulator URL for a program (`#code=...`) |
 | `help` | The simulator's help for students: the contents, a section as Markdown, or a lookup (`MOVB`, `DSPCS`) |
+| `spec` | The specification, for exact behaviour the help leaves out: [machine](../../docs/BLUE11_MACHINE.md), [display](../../docs/BLUE11_DISPLAY.md), [keyboard](../../docs/BLUE11_KEYBOARD.md), [sound](../../docs/BLUE11_SOUND.md) and the [library's README](../../packages/blue11/README.md) (the assembler's compatibility with MACRO-11). The contents, a whole document, one section (`5.1`, `registers`), or a search |
 | `examples` | The simulator's example programs, with their source |
 
 The server also sends the client short instructions: octal numbers, the layout of a line, the
-predefined names, the screen's memory, and the workflow above.
+predefined names, the screen's memory, the workflow above, and when to read `help` (writing
+programs) or `spec` (cycles, interrupts, the beam, sound, MACRO-11), with the documents' GitHub
+links.
+
+The documents are bundled into the server, so an agent reads the specification of the machine
+it runs, whatever version that is, and needs no network. A link between them becomes a topic.
 
 ## How it is built
 
@@ -49,6 +55,8 @@ predefined names, the screen's memory, and the workflow above.
   `test/session.test.ts`.
 - `src/server.ts`: the tools on the MCP SDK, with their schemas (zod). Tested through the
   protocol with an in-memory transport in `test/server.test.ts`.
+- `src/spec.ts`: the specification's documents (`?raw` imports), their sections and a search.
+  Tested in `test/spec.test.ts`, which checks that every document and section is served.
 - `src/main.ts`: stdio. `src/png.ts`: frames as PNGs (Node's zlib).
 
 It imports the simulator's DOM-free core (`sim.ts`, `debug.ts`, `traps.ts`, `storage.ts`,

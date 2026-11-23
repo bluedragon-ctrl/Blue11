@@ -8,6 +8,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { DEFAULT_SIMULATOR_URL, MAX_FRAMES, MAX_SNAPSHOTS, Session } from './session';
+import { SPECS } from './spec';
 
 export const INSTRUCTIONS = `Blue-11 is a PDP-11-style 16-bit computer for teaching, with a screen, a keyboard, a console and a speaker. These tools run programs on the same machine as the browser simulator (with its ROM), headless and deterministic: the same call always gives the same result.
 
@@ -18,7 +19,7 @@ Writing Blue-11 assembly (a subset of MACRO-11):
 - Predefined names: the console (RCSR, RBUF, XCSR, XBUF), the line clock (LKS), the display (SCREEN, DSPCS, DSPFRM, DSPLIN, DSPPAL, DSPVEC), the keyboard (KBDCS, KBDBUF, KBDKEY, KBDVEC, key codes K.UP, K.LEFT, K.SPC...), the sound (SNDCS, SNDDIV), PSW, and the ROM's DRAWCH, DRAWC1 and FONT.
 - The screen is memory: mode 0 is 64 x 64 pixels, a byte each, at SCREEN + row*100 + column (octal); mode 1 is 128 x 128, 4 bits a pixel.
 - MUL, DIV, ASH and ASHC need eis: true.
-Read help (no arguments for the contents, or a query such as "DSPCS" or "MOVB") and the examples before writing something new: they are short and correct.
+Read help (no arguments for the contents, or a query such as "DSPCS" or "MOVB") and the examples before writing something new: they are short and correct. For exact behaviour the help leaves out (cycle counts, interrupt priorities and timing, the scanning beam, palettes, the tone generator, how the assembler differs from MACRO-11), read the specification with spec: topics machine, display, keyboard, sound and library, a section at a time, or a query. It is also on GitHub: ${SPECS.map((s) => s.url).join(', ')}.
 
 The workflow: assemble to check, run (it reports the console output, registers, the stop and its source line, the screen as an image, and a link), then step, state, memory or continue to debug. A run is in screen frames: 60 frames are one second of machine time (20000 cycles each). Keyboard and console input are given with the frame they happen at. When a program works, give the person its share link: it opens in the simulator at ${DEFAULT_SIMULATOR_URL}, where they can run and step it themselves.`;
 
@@ -35,7 +36,7 @@ const eis = z.boolean().optional().describe('The EIS option (MUL, DIV, ASH, ASHC
 const beam = z.enum(['instant', 'scan']).optional().describe('"scan": the real beam, which tears. Default "instant".');
 
 export function createServer(session = new Session(process.env.BLUE11_SIMULATOR_URL || undefined)): McpServer {
-  const server = new McpServer({ name: 'blue11', version: '0.1.0' }, { instructions: INSTRUCTIONS });
+  const server = new McpServer({ name: 'blue11', version: '0.2.0' }, { instructions: INSTRUCTIONS });
   const read = { readOnlyHint: true, openWorldHint: false };
 
   server.registerTool('assemble', {
@@ -113,6 +114,17 @@ export function createServer(session = new Session(process.env.BLUE11_SIMULATOR_
     },
     annotations: read,
   }, (a) => session.helpTool(a));
+
+  server.registerTool('spec', {
+    title: 'Specification',
+    description: `The Blue-11 specification, for exact behaviour beyond the help: the design documents and the library's README, as built into this server. No arguments: the topics and their sections. topic: a whole document (${SPECS.map((s) => s.id).join(', ')}); with section, one section; query: search them all.`,
+    inputSchema: {
+      topic: z.string().optional().describe(SPECS.map((s) => `${s.id}: ${s.about}`).join('; ')),
+      section: z.string().optional().describe('With topic: a section number ("4", "5.1") or words of its heading ("registers", "assembler compatibility").'),
+      query: z.string().optional().describe('Words or a name (DSPVEC, "tone generator") to find in every document.'),
+    },
+    annotations: read,
+  }, (a) => session.spec(a));
 
   server.registerTool('examples', {
     title: 'Examples',

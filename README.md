@@ -37,7 +37,7 @@ console.log(m.output);      // HELLO
   through them with the registers, memory and disassembly in view, with a searchable help
   ([`apps/simulator`](apps/simulator/README.md)).
 - **For AI agents:** an [MCP server](apps/mcp/README.md) that assembles, runs and debugs
-  programs on the simulator's machine, shows the agent the screen, and gives you a link that
+  programs on the simulator's machine, shows the agent the screen, serves it the help and the full specification, and gives you a link that
   opens the program in the simulator. Claude Code finds it in [`.mcp.json`](.mcp.json).
 - **What comes next:** [`docs/ROADMAP.md`](docs/ROADMAP.md).
 - **Used by:** [HackCode](https://github.com/bluedragon-ctrl/HackCode), a game where you program
