@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "blue11": {
+      "command": "npm",
+      "args": ["run", "-s", "start", "-w", "apps/mcp"]
+    }
+  }
+}

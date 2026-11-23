@@ -11,14 +11,17 @@ for teaching, with a simulator for students in the browser
 | :--- | :--- | :--- |
 | `packages/blue11/` | the library, published to npm as `blue11` | [`packages/blue11/AGENTS.md`](packages/blue11/AGENTS.md): no imports from outside `src/`, no runtime dependencies, deterministic |
 | `apps/simulator/` | the student simulator, a Vite page deployed to GitHub Pages: [`apps/simulator/README.md`](apps/simulator/README.md) | a host like any other: it uses only the library's public API; its core (`src/sim.ts`) has no DOM and is tested |
+| `apps/mcp/` | an MCP server for AI agents: assemble, run and debug programs on the simulator's machine, see the screen, give share links: [`apps/mcp/README.md`](apps/mcp/README.md) | it imports the simulator's DOM-free core from source, so `sim.ts`, `debug.ts`, `traps.ts`, `storage.ts`, `programs.ts`, `rom.ts` and `help/model.ts`, `help/sections.ts` must stay free of the DOM |
 | `docs/` | the design: [machine](docs/BLUE11_MACHINE.md), [display](docs/BLUE11_DISPLAY.md), [keyboard](docs/BLUE11_KEYBOARD.md), [sound](docs/BLUE11_SOUND.md), [roadmap](docs/ROADMAP.md) | update them when a design decision changes |
 
 ## Commands (at the root)
 
 - `npm test`: every workspace's tests.
 - `npm run typecheck`, `npm run build`: the library builds to `packages/blue11/dist/` (ESM and
-  types), the simulator to `apps/simulator/dist/`.
+  types), the simulator to `apps/simulator/dist/`, the MCP server to `apps/mcp/dist/server.js`.
 - `npm run dev -w apps/simulator`: the simulator on a local dev server.
+- `npm run -s start -w apps/mcp`: the MCP server on stdio (`.mcp.json` declares it for Claude
+  Code).
 
 CI (`.github/workflows/ci.yml`) typechecks, tests, builds, then packs the package and imports
 it, on every PR and push to `main`; on `main` it also deploys the simulator to GitHub Pages. To release, bump `packages/blue11/package.json` and
