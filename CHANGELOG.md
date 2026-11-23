@@ -5,6 +5,32 @@ minor version may break the API, and a patch never does. The public API is every
 exported from `blue11` and `blue11/codemirror`, plus the JSON form of saved states
 (`cpu.save()`, `display.state()`, `keyboard.state()`, `sound.state()`).
 
+## 0.9.0 (2026-11-23)
+
+Assembler messages for sizes (roadmap step 11): every size pass 1 can't know is an error on
+its own line that names the symbol and where it is defined, and labels never move between
+passes. Programs that assembled before may now have an error (the first item); error texts
+changed.
+
+- A symbol whose value uses a later symbol (`N = X` with `X` defined after it) was 0 in pass 1.
+  Used before its definition it assembled silently as 0 (`MOV #N, R0`); now that is an error,
+  `N is not known here (N, on line 2, uses X, which is defined after it, on line 3)`. Used for a
+  size (`.BLKW N`, `. = . + N`) it moved every later label and gave "moved between passes";
+  now it is an error on that line.
+- `.BLKW`, `.BLKB`, `. =` and `DIR = %N` with a later symbol name its line:
+  `.BLKW needs a size known at this point (N is defined later, on line 3)`, and follow chains
+  (`N, on line 1, depends on X, which is defined after it, on line 5`). A register symbol defined
+  from a later value is such an error (it was "needs %0–%7"), and a register symbol used before
+  its definition names the line (`DIR is used before line 3 defines it as a register (DIR = %n)`).
+- A name is one kind of thing: a label, a value or a register. A label after `N = …`, a value
+  after `DIR = %n`, and the like are errors naming the first definition, decided alike in both
+  passes (some gave "moved between passes", some an error on the wrong line). A rejected label
+  is no longer in `labels`.
+- A line with an error in pass 2 moves the location counter as it did in pass 1 (its bytes, and
+  now also `. =`), so later labels stay put. "moved between passes" is gone; a line whose size
+  still differed would say "internal error … (please report this program)", and a test of
+  random programs checks that none does.
+
 ## 0.8.0 (2026-11-18)
 
 A sound device: a one-bit speaker (docs/BLUE11_SOUND.md).

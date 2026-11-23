@@ -81,10 +81,14 @@ README as a departure from the original machine.
     its tests and four examples, a README section and the departure listed; in the simulator,
     the speaker played with Web Audio (true pitch at real time, like a tape at other speeds), volume and mute, a Sound tab with the
     last frame's waveform, the console's bell, and a help page.
-11. **Assembler messages for sizes.** Name the symbol and its line whenever a size depends on
-    a later definition (the 0.4.0 fixes cover `.BLKW`, `. =` and register symbols; check every
-    other place where pass 1 and pass 2 can disagree, and make "moved between passes" a
-    message that should never be seen).
+11. ~~**Assembler messages for sizes.**~~ (done, 2026-11-23, `blue11` 0.9.0): every size pass
+    1 can't know is an error on its own line naming the symbol and the line defining it, also
+    through chains (`N = X`, `X` later). Three more causes of "moved between passes" were found
+    by testing random programs and fixed: a symbol whose value used a later one was a silent 0
+    in pass 1 (and `MOV #N, R0` before it assembled as 0), a line failing only in pass 2 lost
+    its `. =` move, and a name defined as two kinds (label, value, register) was judged
+    differently by the passes. The message is now an internal error that a seeded test of
+    random programs checks never appears.
 12. **A memory explorer in the simulator** (only the simulator; the library's public API is
     enough). The side panel shows 32 words, so the address space as a whole (vectors, code,
     data, stack, pixels, ROM, devices) is only in the docs. In four steps, one PR each:

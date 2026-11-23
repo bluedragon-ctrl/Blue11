@@ -156,9 +156,14 @@ is tested in `test/syntax.test.ts` and `syntax-warnings.test.ts`.
 - Local labels `n$` between two ordinary labels, or from `.ENABL LSB` to `.DSABL LSB` (or the
   next `.ENABL LSB`); all eight addressing modes with the PC forms `#n`, `@#a`, `LABEL`,
   `@LABEL`. `.ENABL AMA` assembles `LABEL` as `@#LABEL`.
-- A size or address must be known when the line is reached: `.BLKW N` or `. = A` with `N`
-  or `A` defined later is an error on that line, and so is a register symbol (`DIR = %1`)
-  used before its definition.
+- Two passes, as the original: a size or address must be known when the line is reached.
+  `.BLKW N`, `. = A` or `DIR = %N` with `N` or `A` defined later is an error on that line
+  that names the symbol and the line defining it, and so is a register symbol (`DIR = %1`)
+  used before its definition. A symbol whose value uses a later one (`N = X`, `X` defined
+  after it) is unknown until pass 2: it can't size anything, and used before its own
+  definition it is an error, not 0. Labels never move between passes.
+- A name is one kind of thing: a label, a value (`N = 5`, which may be redefined) or a
+  register (`DIR = %1`, likewise); defining it as another kind later is an error.
 - `.END expr` sets the start address and ends the source.
 - An expression where the instruction goes is an implicit `.WORD`: `TABLE: CMD1, CMD2`,
   `1234`. An instruction name first on a line is always the instruction, and a name
