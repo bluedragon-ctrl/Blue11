@@ -163,21 +163,95 @@ describe('blue11 assembler: errors are values with line and column', () => {
 });
 
 describe('blue11 assembler: sizes that pass 1 cannot know', () => {
-  it('.BLKW / .BLKB / . = with a later symbol: the error is on that line, and nothing moves', () => {
-    for (const src of [' .BLKW N\nL: HALT\nN = 5', ' .BLKB N\nN = 5', ' . = A\n HALT\nA = 2000']) {
-      const a = assemble(src);
-      expect(a.errors.map((e) => [e.line, e.message]), src).toEqual([
-        [1, expect.stringMatching(/needs .*known.*N|A is defined later/)],
-      ]);
-    }
-    expect(err(' .BLKW N\nL: HALT\nN = 5')).toBe('.BLKW needs a size known at this point (N is defined later)');
-    expect(err(' . = A\n HALT\nA = 2000')).toBe('the location counter can only move to a known address (A is defined later)');
+  const errs = (src: string) => assemble(src).errors.map((e) => [e.line, e.message]);
+
+  it('.BLKW / .BLKB / . = with a later symbol: the error is on that line, names the symbol and its line, and nothing moves', () => {
+    expect(errs(' .BLKW N\nL: HALT\nN = 5')).toEqual([[1, '.BLKW needs a size known at this point (N is defined later, on line 3)']]);
+    expect(errs(' .BLKB N\nN = 5')).toEqual([[1, '.BLKB needs a size known at this point (N is defined later, on line 2)']]);
+    expect(errs(' . = A\n HALT\nA = 2000')).toEqual([[1, 'the location counter can only move to a known address (A is defined later, on line 3)']]);
+    expect(errs(' .BLKB 1$-.\n1$: HALT')).toEqual([[1, '.BLKB needs a size known at this point (1$ is defined later, on line 2)']]);
+    expect(errs(' .BLKW END-.\nEND: HALT')).toEqual([[1, '.BLKW needs a size known at this point (END is defined later, on line 2)']]);
   });
 
-  it('a register alias used before its definition: an error on the line that uses it', () => {
+  it('a symbol whose value comes from a later symbol is not known in pass 1: sizes say which and where', () => {
+    // It used to be 0 in pass 1: L moved, and the error was "moved between passes" on line 3.
+    expect(errs(' N = X\n .BLKW N\nL: HALT\nX = 5')).toEqual([[2, '.BLKW needs a size known at this point (N, on line 1, uses X, which is defined after it, on line 4)']]);
+    expect(errs(' N = X\n. = . + N\nL: HALT\nX = 5')).toEqual([[2, 'the location counter can only move to a known address (N, on line 1, uses X, which is defined after it, on line 4)']]);
+    // A chain: N waits for M, which waits for X. Even pass 2 can't know N on line 1.
+    expect(errs(' N = M\nM = X\n .BLKB N\nL: HALT\nX: HALT')).toEqual([
+      [1, 'M is not known here (M, on line 2, uses X, which is defined after it, on line 5)'],
+      [3, '.BLKB needs a size known at this point (N, on line 1, depends on X, which is defined after it, on line 5)'],
+    ]);
+    // Known once its parts are: X before N, or N used after both.
+    expect(assemble(' X = 5\nN = X\n .BLKW N\nL: HALT').symbols.get('L')).toBe(0o1012);
+    expect(errs(' N = X\n .BLKW N\nX = 5')[0][1]).not.toMatch(/moved/);
+  });
+
+  it('a symbol whose value comes from a later symbol, used before its definition: an error, not a silent 0', () => {
+    expect(errs(' MOV #N, R0\nN = X\nX = 5')).toEqual([[1, 'N is not known here (N, on line 2, uses X, which is defined after it, on line 3)']]);
+    expect(errs(' .WORD N\nN = X+1\nX: HALT')).toEqual([[1, 'N is not known here (N, on line 2, uses X, which is defined after it, on line 3)']]);
+    expect(words(' N = X\nX = 5\n MOV #N, R0')).toEqual([0o012700, 5]);
+    expect(words(' MOV #N, R0\nN = 5')).toEqual([0o012700, 5]); // an ordinary forward reference
+    expect(errs(' N = X\n .BLKW N')).toEqual([[1, 'undefined symbol X'], [2, '.BLKW needs a size known at this point (N, on line 1, uses X, which is never defined)']]);
+  });
+
+  it('a register alias used before its definition, or defined from a later value: errors that name the line', () => {
     const a = assemble('START: MOV #1, DIR\nL: HALT\nDIR = %1\n .END START');
-    expect(a.errors.map((e) => [e.line, e.message])).toEqual([[1, 'DIR is used before DIR = %n defines it as a register']]);
+    expect(a.errors.map((e) => [e.line, e.message])).toEqual([[1, 'DIR is used before line 3 defines it as a register (DIR = %n)']]);
     expect(assemble('DIR = %1\nSTART: MOV #1, DIR\n .END START').ok).toBe(true);
+    expect(errs('R = %N\nN = 1')).toEqual([[1, 'a register symbol needs a value known at this point (N is defined later, on line 2)']]);
+    expect(errs('R = %9.')).toEqual([[1, 'a register symbol needs %0–%7']]);
+  });
+
+  it('a line that fails in pass 2 moves . as it did in pass 1', () => {
+    // It used to fail on line 2 in pass 2 only (L1 a register by then), and L2 moved.
+    expect(errs('L1: HALT\n. = . + <L1-.>+4\nL2: HALT\nL1 = %0')).toEqual([[4, 'L1 is a label (line 1); it can\'t also be a register']]);
+    // A branch out of range is known only in pass 2: its 2 bytes stay.
+    const a = assemble(' BR X\nL: HALT\n .BLKW 200\nX: HALT');
+    expect(a.errors.map((e) => e.line)).toEqual([1]);
+    expect(a.symbols.get('L')).toBe(0o1002);
+  });
+
+  it('a name is one kind of thing: a label, a value or a register (both passes agree)', () => {
+    expect(errs('A: C = A\n .BLKW C\nC: HALT')).toEqual([[3, 'C is a symbol (C = … on line 1); it can\'t also be a label']]);
+    expect(errs('C: HALT\nC = 5')).toEqual([[2, 'C is a label']]);
+    expect(errs('C: C = 5')).toEqual([[1, 'C is a label']]);
+    // Decided from pass 1 alone: line 2 fails, and A still counts as given a value there.
+    expect(errs('L2 = %4\nA = L2+1\nA: HALT')).toEqual([[2, 'L2 is a register; a value is needed here'], [3, 'A is a symbol (A = … on line 2); it can\'t also be a label']]);
+    expect(errs('R = 5\nR = %1')).toEqual([[2, 'R is a symbol (R = … on line 1); it can\'t also be a register']]);
+    expect(errs('R = %1\nR = 5')).toEqual([[2, 'R is a register (R = %n on line 1); it can\'t also be given a value']]);
+    expect(errs('R = %1\nR: HALT')).toEqual([[2, 'R is a register (R = %n on line 1); it can\'t also be a label']]);
+    expect(errs('R: HALT\nR = %1')).toEqual([[2, 'R is a label (line 1); it can\'t also be a register']]);
+    expect(assemble('N = 1\nN = N+1\nR = %1\nR = %2\n MOV N, R').ok).toBe(true); // redefinitions of one kind
+  });
+
+  it('labels never move between passes: random programs of forward references (seeded)', () => {
+    // mulberry32: well mixed in every bit (an LCG's low bits repeat too soon for `% n`).
+    let seed = 1;
+    const rnd = (n: number) => {
+      seed = (seed + 0x6d2b79f5) | 0;
+      let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) % n;
+    };
+    const names = ['A', 'B', 'C', 'R', 'L1', 'L2'];
+    const nm = () => names[rnd(names.length)];
+    const expr = () => [nm(), '2', `${nm()}-${nm()}`, `${nm()}+1`, '.', `.-${nm()}`, '1$', `<${nm()}-.>/2`][rnd(8)];
+    const gens = [
+      () => `${nm()} = ${expr()}`, () => `${nm()} = %${rnd(2) ? rnd(8) : nm()}`, () => `${nm()}: NOP`, () => '1$: NOP',
+      () => `.BLKW ${expr()}`, () => `.BLKB ${expr()}`, () => '.EVEN', () => `. = . + ${expr()}`,
+      () => `MOV ${nm()}, ${nm()}`, () => `MOV #${expr()}, @${nm()}`, () => `CLR ${nm()}(R1)`, () => `JMP ${nm()}`,
+      () => `BR ${nm()}`, () => nm(), () => `.WORD ${expr()}`, () => `.BYTE ${expr()}`, () => `.ASCII /X/<${expr()}>`,
+      () => `RTS ${nm()}`, () => `INC %${nm()}`, () => `${nm()}: .BLKB ${expr()}`, () => '.ENABL LSB',
+      () => '.ODD', () => '.ENABL AMA', () => '.DSABL LSB', () => `MOV (${nm()})+, -(${nm()})`, () => `SOB ${nm()}, ${nm()}`,
+      () => `.END ${nm()}`, () => `${nm()}: ${nm()} = ${expr()}`, () => `JSR ${nm()}, @${nm()}`, () => `.BLKW <${expr()}>&7`,
+      () => `EMT ${expr()}`, () => `MOV ${nm()}(${nm()}), @${expr()}(R2)`,
+    ];
+    for (let t = 0; t < 30000; t++) {
+      const n = 2 + rnd(7);
+      const src = Array.from({ length: n }, () => '  ' + gens[rnd(gens.length)]()).join('\n');
+      for (const e of assemble(src).errors) expect(e.message, src).not.toMatch(/internal error|moved/);
+    }
   });
 });
 

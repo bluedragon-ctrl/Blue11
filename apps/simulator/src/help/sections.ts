@@ -233,6 +233,7 @@ const problems: Section = {
       '**Decimal by mistake**: `MOV #100, R0` is sixty-four. Write `100.` for a hundred. See [octal](octal).',
       '**No `HALT` before the data**: the CPU runs into the data as if it were instructions.',
       '**Words at odd addresses**: after `.ASCIZ` or `.BYTE`, add `.EVEN` before more words or code.',
+      '**A size from a name defined below**: the assembler reads the program twice, and on the first reading it must know every size. `.BLKW N` needs `N` defined above it, and so does `N = X` when `X` is defined below. The error says which name and on which line it is defined: move that line up.',
       '**Branching on old flags**: an instruction between the `CMP` and the branch changed them. Compare just before you branch.',
       '**Wrong `CMP` order**: `CMP R0, #10` then `BLT` branches if R0 < 10. The first operand is the one on the left of `<`.',
       '**An unbalanced stack**: every push needs its pop before `RTS PC`, or it returns to the wrong place.',

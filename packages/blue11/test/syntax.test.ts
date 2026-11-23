@@ -54,6 +54,15 @@ describe('assembler compatibility', () => {
     expect(assembleOk('N = 5\nN2 == 6\nX = %2\nA:: CLR X\n. = . + 10\nB: BR .+4').symbols.get('B')).toBe(0o1000 + 2 + 8);
   });
 
+  it('two passes: sizes known when reached, forward references elsewhere; a name is one kind of thing', () => {
+    expect(words(' MOV #N, R0\nN = 5')).toEqual([0o012700, 5]); // a forward reference
+    expect(err(' .BLKW N\nN = 5')).toBe('.BLKW needs a size known at this point (N is defined later, on line 2)');
+    expect(err(' MOV #N, R0\nN = X\nX = 5')).toMatch(/^N is not known here/); // not a silent 0
+    expect(err('N = 5\nN: HALT')).toMatch(/can't also be a label/);
+    expect(err('R = %1\nR = 5')).toMatch(/can't also be given a value/);
+    expect(assembleOk('N = 1\nN = N+1\nR = %1\nR = %2\n MOV #N, R').symbols.get('N')).toBe(2);
+  });
+
   it('local labels live between two ordinary labels', () => {
     expect(words('A: BR 1$\n1$: BR A\nB: BR 1$\n1$: HALT')).toEqual([0o000400, 0o000776, 0o000400, 0]);
     expect(err('L: HALT\n1$: BR L\nM: BR 1$')).toMatch(/undefined symbol 1\$/);

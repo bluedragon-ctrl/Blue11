@@ -118,8 +118,11 @@ class Assembler {
   private readonly symbols = new Map<string, number>();
   private readonly regSymbols = new Map<string, number>();
   private readonly labels = new Set<string>();
-  /** Bytes each line produced in pass 1, so a line with an error keeps its size in pass 2. */
-  private pass1Size = new Map<number, number>();
+  /**
+   * How far each line moved the location counter in pass 1 (its bytes, `. =`, `.EVEN`), so a
+   * line with an error in pass 2 moves it the same, and later labels stay where pass 1 put them.
+   */
+  private pass1Move = new Map<number, number>();
   /**
    * Lines that failed in pass 1, where pass 1 could not know their size (`.BLKW N` with `N`
    * defined later). Pass 2 fails them the same way, so later labels stay where pass 1 put them.
@@ -127,12 +130,26 @@ class Assembler {
   private pass1Fail = new Map<number, { message: string; column: number; name?: string }>();
   /** The line where each register symbol (`DIR = %1`) is first defined. */
   private regSymbolLine = new Map<string, number>();
+  /** The line where each symbol and label is first defined (pass 1), for messages. */
+  private defLine = new Map<string, number>();
+  /**
+   * Symbols whose value, where pass 1 defined them, used a symbol defined after them (`N = X`,
+   * `X = 5` later): the symbol they wait for, as written and as a key. Pass 1 leaves them
+   * unknown, as a two-pass assembler must, so no size is computed from a guess.
+   */
+  private later = new Map<string, { name: string; key: string }>();
   /** `.ENABL LSB`: ordinary labels don't end the local-label block. */
   private lsb = false;
   /** `.ENABL AMA`: relative operands are assembled as absolute (`@#`). */
   private ama = false;
   /** Labels defined so far in this pass (duplicates). */
   private definedThisPass = new Set<string>();
+  /**
+   * What each name was first defined as in pass 1, and where (a label's place on line L is
+   * 2L, an assignment's 2L+1: labels come first on a line). A later definition of another
+   * kind is an error. Only pass 1 records it, so both passes decide alike, whatever fails.
+   */
+  private kinds = new Map<string, { kind: 'label' | 'value' | 'register'; at: number }>();
   private errors: AsmError[] = [];
   private warnings: AsmError[] = [];
   /** Warnings already given (line, column, message), so one evaluated twice is given once. */
@@ -212,6 +229,20 @@ class Assembler {
 
   /** Returns false at `.END`. */
   private line(raw: string): boolean {
+    const start = this.lc;
+    const more = this.lineInner(raw, start);
+    const moved = (this.lc - start) & 0xffff;
+    if (this.pass === 1) this.pass1Move.set(this.lineNo, moved);
+    else if (moved !== (this.pass1Move.get(this.lineNo) ?? 0)) {
+      // Every size pass 1 can't know is an error on its own line, so this is a bug; still,
+      // later labels stay where pass 1 put them, and the error is on the line that changed.
+      this.error(`internal error: this line moves . by ${octal(moved)} in pass 2 but ${octal(this.pass1Move.get(this.lineNo) ?? 0)} in pass 1 (please report this program)`);
+      this.lc = (start + (this.pass1Move.get(this.lineNo) ?? 0)) & 0xffff;
+    }
+    return more;
+  }
+
+  private lineInner(raw: string, start: number): boolean {
     const text = stripComment(raw);
     let pos = 0;
     const skip = (): void => { while (pos < text.length && /\s/.test(text[pos])) pos++; };
@@ -228,8 +259,8 @@ class Assembler {
       const failed = this.pass === 2 ? this.pass1Fail.get(this.lineNo) : undefined;
       // A size pass 1 could not know: fail again (explaining why), unless the symbol is still
       // undefined, which the line itself reports.
-      if (failed && (!failed.name || this.defined(failed.name, pos))) {
-        throw new AsmFail(failed.name ? `${failed.message} (${failed.name} is defined later)` : failed.message, failed.column);
+      if (failed && (!failed.name || this.defined(failed.name, pos) || this.later.has(this.keyOf(failed.name)))) {
+        throw new AsmFail(failed.name ? `${failed.message} (${this.whyUnknown(failed.name)})` : failed.message, failed.column);
       }
       const rest = text.slice(pos);
       if (rest === '') { this.record(this.lc, [], false); return true; }
@@ -276,10 +307,10 @@ class Assembler {
         this.pass1Fail.set(this.lineNo, { message: e.message, column: e.column, name: e instanceof SizeFail ? e.name : undefined });
       }
       this.error(e.message, e.column);
-      const size = this.pass === 2 ? (this.pass1Size.get(this.lineNo) ?? 0) : 0;
-      const here = this.lc;
-      this.lc = (this.lc + size) & 0xffff; // keep later labels where pass 1 put them
-      this.lines.push({ line: this.lineNo, address: here, bytes: [], code: false });
+      // Keep later labels where pass 1 put them: move as this line did in pass 1 (not at all
+      // if it failed there too).
+      this.lc = this.pass === 2 ? (start + (this.pass1Move.get(this.lineNo) ?? 0)) & 0xffff : start;
+      this.lines.push({ line: this.lineNo, address: start, bytes: [], code: false });
     }
     return true;
   }
@@ -293,7 +324,6 @@ class Assembler {
   }
 
   private record(address: number, bytes: number[], code: boolean): void {
-    if (this.pass === 1 && bytes.length) this.pass1Size.set(this.lineNo, (this.pass1Size.get(this.lineNo) ?? 0) + bytes.length);
     this.lines.push({ line: this.lineNo, address, bytes, code });
     for (let i = 0; i < bytes.length; i++) {
       const a = (address + i) & 0xffff;
@@ -322,9 +352,10 @@ class Assembler {
     } else {
       key = this.checkName(name, column, true);
       if (!this.lsb) this.scope++;
-      this.labels.add(key);
     }
     this.defineSymbol(key, this.lc, column, true);
+    // Only once it is one: a rejected label must not make an earlier `=` "a label" in pass 2.
+    if (!/^\d+\$$/.test(name)) this.labels.add(key);
     if (!/^\d/.test(key) && BY_NAME.has(key)) this.warn(`${key} is also an instruction; as a value it now means this label`, column);
   }
 
@@ -332,13 +363,33 @@ class Assembler {
     const prev = this.symbols.get(key);
     if (label) {
       if (this.definedThisPass.has(key)) throw new AsmFail(`${key.replace(/^\d+:/, '')} is defined twice`, column);
+      this.checkKind(key, 'label', column);
       this.definedThisPass.add(key);
       if (this.predefined.has(key)) throw new AsmFail(`${key} is a predefined symbol`, column);
     }
+    // Every size pass 1 can't know is an error on its own line (SizeFail), so this is a bug.
     if (this.pass === 2 && label && prev !== value) {
-      throw new AsmFail(`${key} moved between passes (a size depends on a later symbol)`, column);
+      throw new AsmFail(`internal error: ${key.replace(/^\d+:/, '')} is at ${octal(prev ?? 0)} in pass 1 but ${octal(value)} in pass 2 (please report this program)`, column);
     }
+    if (this.pass === 1 && !this.defLine.has(key)) this.defLine.set(key, this.lineNo);
     this.symbols.set(key, value & 0xffff);
+  }
+
+  /**
+   * A name is one kind of thing: a label, a value (`N = 5`, redefinable) or a register
+   * (`DIR = %1`, redefinable). Decided from what pass 1 saw before this place, so both passes
+   * agree. Local labels are only labels.
+   */
+  private checkKind(key: string, kind: 'label' | 'value' | 'register', column: number): void {
+    const at = 2 * this.lineNo + (kind === 'label' ? 0 : 1);
+    const first = this.kinds.get(key);
+    if (this.pass === 1 && !first) this.kinds.set(key, { kind, at });
+    if (!first || first.at >= at || first.kind === kind) return;
+    const name = key.replace(/^\d+:/, '');
+    const line = first.at >> 1;
+    if (first.kind === 'label') throw new AsmFail(kind === 'value' ? `${name} is a label` : `${name} is a label (line ${line}); it can't also be a register`, column);
+    const what = first.kind === 'value' ? `a symbol (${name} = … on line ${line})` : `a register (${name} = %n on line ${line})`;
+    throw new AsmFail(`${name} is ${what}; it can't also be ${kind === 'label' ? 'a label' : kind === 'value' ? 'given a value' : 'a register'}`, column);
   }
 
   private assign(name: string, exprText: string, column: number, exprCol: number): void {
@@ -351,15 +402,25 @@ class Assembler {
     const key = this.checkName(name, column, true);
     const t = exprText.trim();
     if (t.startsWith('%')) {
+      this.checkKind(key, 'register', column);
       const v = this.expr(t.slice(1), exprCol + 1);
-      if (v.undef || v.value > 7) throw new AsmFail('a register symbol needs %0–%7', exprCol);
+      // Pass 1 must know it: it decides the size of every operand that uses the name.
+      if (v.undef) throw new SizeFail('a register symbol needs a value known at this point', exprCol, v.undefName);
+      if (v.value > 7) throw new AsmFail('a register symbol needs %0–%7', exprCol);
       this.regSymbols.set(key, v.value);
       if (!this.regSymbolLine.has(key)) this.regSymbolLine.set(key, this.lineNo);
       return;
     }
-    if (this.labels.has(key)) throw new AsmFail(`${name} is a label`, column);
+    this.checkKind(key, 'value', column);
     const v = this.expr(exprText, exprCol);
-    if (!v.undef || this.pass === 1) this.symbols.set(key, v.value & 0xffff);
+    if (this.pass === 1 && !this.defLine.has(key)) this.defLine.set(key, this.lineNo);
+    if (v.undef) {
+      // Pass 1 only (pass 2 has thrown): unknown until pass 2, not a guess of 0.
+      this.symbols.delete(key);
+      this.later.set(key, { name: v.undefName!, key: this.keyOf(v.undefName!) });
+    } else {
+      this.symbols.set(key, v.value & 0xffff);
+    }
     if (BY_NAME.has(key)) this.warn(`${key} is also an instruction; as a value it now means this symbol`, column);
   }
 
@@ -603,7 +664,8 @@ class Assembler {
     if (up in REGISTERS) return REGISTERS[up];
     if (this.regSymbols.has(up)) {
       // Pass 1 did not know it yet and gave the operand an address word: the sizes would differ.
-      if ((this.regSymbolLine.get(up) ?? 0) > this.lineNo) throw new AsmFail(`${t} is used before ${t} = %n defines it as a register`, column);
+      const line = this.regSymbolLine.get(up) ?? 0;
+      if (line > this.lineNo) throw new AsmFail(`${t} is used before line ${line} defines it as a register (${t} = %n)`, column);
       return this.regSymbols.get(up)!;
     }
     if (up.startsWith('%')) {
@@ -648,12 +710,44 @@ class Assembler {
   private expr(text: string, column: number): Value {
     const p = new ExprParser(text, column, (name, col) => this.lookup(name, col), this.opts.hex ?? false);
     const v = p.parse();
-    if (v.undef && this.pass === 2) throw new AsmFail(`undefined symbol ${p.undefName}`, p.undefCol);
+    if (v.undef && this.pass === 2) {
+      const waits = this.later.has(this.keyOf(p.undefName));
+      throw new AsmFail(waits ? `${p.undefName} is not known here (${this.whyUnknown(p.undefName)})` : `undefined symbol ${p.undefName}`, p.undefCol);
+    }
     if (v.undef) v.undefName = p.undefName;
     if (p.mixedAt !== null) {
       this.warn(`${p.mixedOp} after + or - is evaluated left to right, not first: group with < > (1+<2*3>)`, p.mixedAt);
     }
     return v;
+  }
+
+  /** A name's key in the symbol table: local labels belong to the current block. */
+  private keyOf(name: string): string {
+    return /^\d+\$$/.test(name) ? `${this.scope}:${name}` : name.toUpperCase();
+  }
+
+  /**
+   * Why pass 1 could not know `name` here: `N is defined later, on line 7`, or, for a symbol
+   * whose value waits for a later one, `N, on line 2, uses X, which is defined after it, on line 7`.
+   */
+  private whyUnknown(name: string): string {
+    const key = this.keyOf(name);
+    const lineOf = (k: string) => this.defLine.get(k) ?? this.regSymbolLine.get(k);
+    if (!this.later.has(key)) {
+      const line = lineOf(key);
+      return line === undefined ? `${name} is never defined` : `${name} is defined later, on line ${line}`;
+    }
+    let root = this.later.get(key)!;
+    let links = 1;
+    const seen = new Set([key]);
+    while (this.later.has(root.key) && !seen.has(root.key)) {
+      seen.add(root.key);
+      root = this.later.get(root.key)!;
+      links++;
+    }
+    const line = lineOf(root.key);
+    return `${name}, on line ${this.defLine.get(key)}, ${links > 1 ? 'depends on' : 'uses'} ${root.name}, `
+      + (line === undefined ? 'which is never defined' : `which is defined after it, on line ${line}`);
   }
 
   private defined(name: string, column: number): boolean {
