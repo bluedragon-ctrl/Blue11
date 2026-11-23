@@ -19,6 +19,7 @@ import { CPU_HZ, FRAME_CYCLES } from '../../simulator/src/time';
 import { HelpIndex, plain, type Block, type Section } from '../../simulator/src/help/model';
 import { SECTIONS } from '../../simulator/src/help/sections';
 import { frameToPng } from './png';
+import { specTool } from './spec';
 
 export type Content = { type: 'text'; text: string } | { type: 'image'; data: string; mimeType: 'image/png' };
 export type ToolResult = { content: Content[]; isError?: boolean; [key: string]: unknown };
@@ -367,6 +368,11 @@ export class Session {
     for (const s of this.help.sections) groups.set(s.group, [...(groups.get(s.group) ?? []), s]);
     const toc = [...groups].map(([g, ss]) => `${g}:\n` + ss.map((s) => `- \`${s.id}\`: ${s.title}`).join('\n')).join('\n\n');
     return { content: [text(`The simulator's help, for students. Call help { section: "<id>" } to read one.\n\n${toc}`)] };
+  }
+
+  spec(args: { topic?: string; section?: string; query?: string }): ToolResult {
+    const r = specTool(args);
+    return r.ok ? { content: [text(r.text)] } : fail(r.text);
   }
 
   examples(args: { id?: string }): ToolResult {

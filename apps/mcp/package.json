@@ -1,7 +1,7 @@
 {
   "name": "blue11-mcp",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.2.0",
   "type": "module",
   "description": "An MCP server for Blue-11: assemble, run and debug Blue-11 programs on the simulator's machine, see the screen, and open them in the browser",
   "license": "MIT",

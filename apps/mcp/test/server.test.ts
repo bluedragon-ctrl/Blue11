@@ -15,8 +15,10 @@ describe('the MCP server', () => {
   it('lists its tools and gives instructions', async () => {
     const c = await connect();
     const names = (await c.listTools()).tools.map((t) => t.name);
-    expect(names).toEqual(['assemble', 'run', 'continue', 'step', 'state', 'memory', 'screen', 'share_link', 'help', 'examples']);
+    expect(names).toEqual(['assemble', 'run', 'continue', 'step', 'state', 'memory', 'screen', 'share_link', 'help', 'spec', 'examples']);
     expect(c.getInstructions()).toContain('Numbers are octal');
+    expect(c.getInstructions()).toContain('spec');
+    expect(c.getInstructions()).toContain('docs/BLUE11_MACHINE.md');
   });
 
   it('runs a program through the protocol: text and a PNG', async () => {
