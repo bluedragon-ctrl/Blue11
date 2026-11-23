@@ -13,7 +13,8 @@ cycles, and the same call always gives the same result.
 
 ## Use it
 
-From this repository, after `npm install`:
+To set it up in the Claude desktop app (or to send someone the steps), see
+[CONNECT.md](CONNECT.md). From this repository, after `npm install`:
 
 - **Claude Code:** the repository's [`.mcp.json`](../../.mcp.json) declares the server, so
   Claude Code offers it when started at the root (approve it once). Elsewhere:
