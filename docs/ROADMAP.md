@@ -18,6 +18,11 @@ README as a departure from the original machine.
 - **Its own repository** (2026-11-18). The library moved out of HackCode with its history, as
   npm workspaces, with a build to ESM plus types, an MIT licence, CI, and publishing to npm.
 - **`blue11` 0.1.0 on npm** (2026-11-18), published from CI with provenance.
+- **An MCP server** (2026-11-23, [`apps/mcp`](../apps/mcp/README.md)): an agent assembles,
+  runs (with console and key input at frames, breakpoints, screen snapshots), steps and reads
+  memory on the simulator's machine, sees the screen as a PNG, reads the help and examples, and
+  gives share links. Next, if wanted: publish it to npm (`npx blue11-mcp`), and a bridge to an
+  open simulator tab.
 
 1. ~~**HackCode uses the package**~~ (done, 2026-11-18, in HackCode): it depends on `blue11`
    ^0.1.0; its copies of the library, tests, examples and docs are deleted, and its 309 tests and

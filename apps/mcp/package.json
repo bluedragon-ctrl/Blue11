@@ -1,0 +1,28 @@
+{
+  "name": "blue11-mcp",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "An MCP server for Blue-11: assemble, run and debug Blue-11 programs on the simulator's machine, see the screen, and open them in the browser",
+  "license": "MIT",
+  "bin": {
+    "blue11-mcp": "dist/server.js"
+  },
+  "scripts": {
+    "build": "tsc --noEmit && vite build",
+    "start": "vite build --logLevel error && node dist/server.js",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.2",
+    "blue11": "*",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.5",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.8",
+    "vitest": "^5.1.0"
+  }
+}
